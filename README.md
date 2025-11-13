@@ -61,7 +61,7 @@ L'application offre une interface intuitive avec des fonctionnalités de recherc
 
 ```bash
 # Cloner le repository
-git clone https://github.com/votre-username/payslip-explainer.git
+git clone https://github.com/votre-username/cleardoc.git
 
 # Accéder au dossier
 cd payslip-explainer
@@ -172,7 +172,7 @@ The application offers an intuitive interface with search, filtering, and conten
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/payslip-explainer.git
+git clone https://github.com/your-username/cleardoc.git
 
 # Navigate to folder
 cd payslip-explainer
