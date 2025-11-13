@@ -1,0 +1,177 @@
+import { useState, useMemo } from 'react';
+import { FileText, Github } from 'lucide-react';
+import { SearchBar } from '@/components/SearchBar';
+import { CategoryFilter } from '@/components/CategoryFilter';
+import { PayslipCard } from '@/components/PayslipCard';
+import { EditDialog } from '@/components/EditDialog';
+import { AddPayslipDialog } from '@/components/AddPayslipDialog';
+import { payslipItems as initialPayslipItems } from '@/data/payslipData';
+import { PayslipItem } from '@/types/payslip';
+
+function App() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [payslipItems, setPayslipItems] = useState(initialPayslipItems);
+  const [editingItem, setEditingItem] = useState<PayslipItem | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const filteredItems = useMemo(() => {
+    return payslipItems.filter((item) => {
+      const matchesSearch =
+        searchQuery === '' ||
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.keywords.some((keyword) =>
+          keyword.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+      const matchesCategory =
+        selectedCategory === null || item.category === selectedCategory;
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [payslipItems, searchQuery, selectedCategory]);
+
+  const handleEdit = (item: PayslipItem) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleSave = (updatedItem: PayslipItem) => {
+    setPayslipItems((items) =>
+      items.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+    );
+  };
+
+  const handleAdd = (newItem: Omit<PayslipItem, 'id'>) => {
+    const newId = (Math.max(...payslipItems.map(item => parseInt(item.id))) + 1).toString();
+    const itemWithId: PayslipItem = {
+      ...newItem,
+      id: newId,
+    };
+    setPayslipItems((items) => [...items, itemWithId]);
+    
+    // Afficher les informations dans la console pour copier dans payslipData.ts
+    console.log('\n=== NOUVELLE DESCRIPTION À AJOUTER ===');
+    console.log('Copiez cet objet dans src/data/payslipData.ts :');
+    console.log('\n{');
+    console.log(`  id: '${newId}',`);
+    console.log(`  title: '${newItem.title}',`);
+    console.log(`  description: '${newItem.description}',`);
+    console.log(`  imageUrl: '${newItem.imageUrl}',`);
+    console.log(`  category: '${newItem.category}',`);
+    console.log(`  keywords: ${JSON.stringify(newItem.keywords)}`);
+    console.log('},');
+    console.log('\n=====================================\n');
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="flex flex-col min-h-screen w-full max-w-[1400px] mx-auto">
+        {/* Header */}
+        <header className="bg-white/80 backdrop-blur-sm border-b sticky top-0 z-10 shadow-sm">
+          <div className="px-4 py-6 w-full">
+            <div className="flex items-center justify-between max-w-7xl mx-auto">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary rounded-lg p-2">
+                  <FileText className="h-6 w-6 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    Comprendre ma Fiche de Paie
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    Explications détaillées de chaque ligne
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <AddPayslipDialog onAdd={handleAdd} />
+                <a
+                  href="https://github.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Github className="h-6 w-6" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 w-full">
+          <div className="px-4 py-12 max-w-7xl mx-auto">
+            {/* Search Section */}
+            <div className="mb-12 space-y-8">
+              <div className="text-center space-y-4">
+                <h2 className="text-4xl font-bold text-gray-900">
+                  Recherchez un élément de votre fiche de paie
+                </h2>
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  Utilisez la barre de recherche ou les filtres pour trouver rapidement
+                  l'explication dont vous avez besoin
+                </p>
+              </div>
+              <SearchBar value={searchQuery} onChange={setSearchQuery} />
+              <CategoryFilter
+                selectedCategory={selectedCategory}
+                onSelectCategory={setSelectedCategory}
+              />
+            </div>
+
+            {/* Results */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-semibold text-gray-900">
+                  {filteredItems.length} résultat{filteredItems.length > 1 ? 's' : ''}
+                </h3>
+              </div>
+
+              {filteredItems.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="bg-white rounded-lg p-8 max-w-md mx-auto shadow-sm">
+                    <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">Aucun résultat</h3>
+                    <p className="text-muted-foreground">
+                      Essayez de modifier votre recherche ou vos filtres
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredItems.map((item) => (
+                    <PayslipCard key={item.id} item={item} onEdit={handleEdit} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="bg-white border-t mt-20">
+          <div className="px-4 py-8 max-w-7xl mx-auto">
+            <div className="text-center text-muted-foreground">
+              <p className="text-sm">
+                © 2024 Comprendre ma Fiche de Paie. Toutes les informations sont
+                fournies à titre indicatif.
+              </p>
+            </div>
+          </div>
+        </footer>
+
+        {/* Edit Dialog */}
+        <EditDialog
+          item={editingItem}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSave={handleSave}
+        />
+      </div>
+    </div>
+  );
+}
+
+export default App;
