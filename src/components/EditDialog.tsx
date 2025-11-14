@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PayslipItem } from '@/types/payslip';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface EditDialogProps {
   item: PayslipItem | null;
@@ -28,14 +29,15 @@ interface EditDialogProps {
 }
 
 const categories = [
-  { value: 'salaire', label: 'Salaire' },
-  { value: 'cotisations', label: 'Cotisations' },
-  { value: 'net', label: 'Net' },
-  { value: 'employeur', label: 'Employeur' },
-  { value: 'autres', label: 'Autres' },
+  { value: 'salaire', key: 'category.salaire' },
+  { value: 'cotisations', key: 'category.cotisations' },
+  { value: 'net', key: 'category.net' },
+  { value: 'employeur', key: 'category.employeur' },
+  { value: 'autres', key: 'category.autres' },
 ];
 
 export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps) {
+  const { t } = useLanguage();
   const [editedItem, setEditedItem] = useState<PayslipItem | null>(null);
 
   useEffect(() => {
@@ -57,14 +59,14 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Modifier l'élément</DialogTitle>
+          <DialogTitle>{t('edit.title')}</DialogTitle>
           <DialogDescription>
-            Modifiez le titre, la catégorie, l'URL de l'image et la description de cet élément de fiche de paie.
+            {t('edit.description')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-6 py-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Titre</Label>
+            <Label htmlFor="title">{t('edit.field.title')}</Label>
             <Input
               id="title"
               value={editedItem.title}
@@ -75,7 +77,7 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="category">Catégorie</Label>
+            <Label htmlFor="category">{t('edit.field.category')}</Label>
             <Select
               value={editedItem.category}
               onValueChange={(value) =>
@@ -86,12 +88,12 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
               }
             >
               <SelectTrigger id="category">
-                <SelectValue placeholder="Sélectionner une catégorie" />
+                <SelectValue placeholder={t('edit.field.categoryPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
                   <SelectItem key={cat.value} value={cat.value}>
-                    {cat.label}
+                    {t(cat.key)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -99,20 +101,20 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="imageUrl">URL de l'image</Label>
+            <Label htmlFor="imageUrl">{t('edit.field.imageUrl')}</Label>
             <Input
               id="imageUrl"
               value={editedItem.imageUrl}
               onChange={(e) =>
                 setEditedItem({ ...editedItem, imageUrl: e.target.value })
               }
-              placeholder="https://example.com/image.jpg"
+              placeholder={t('edit.field.imageUrlPlaceholder')}
             />
             {editedItem.imageUrl && (
               <div className="mt-2 rounded-lg overflow-hidden border">
                 <img
                   src={editedItem.imageUrl}
-                  alt="Aperçu"
+                  alt={t('edit.field.imagePreview')}
                   className="w-full h-48 object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
@@ -124,7 +126,7 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('edit.field.description')}</Label>
             <Textarea
               id="description"
               value={editedItem.description}
@@ -138,9 +140,9 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Annuler
+            {t('edit.button.cancel')}
           </Button>
-          <Button onClick={handleSave}>Enregistrer</Button>
+          <Button onClick={handleSave}>{t('edit.button.save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

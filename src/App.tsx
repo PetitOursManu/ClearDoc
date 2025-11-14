@@ -5,10 +5,13 @@ import { CategoryFilter } from '@/components/CategoryFilter';
 import { PayslipCard } from '@/components/PayslipCard';
 import { EditDialog } from '@/components/EditDialog';
 import { AddPayslipDialog } from '@/components/AddPayslipDialog';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { payslipItems as initialPayslipItems } from '@/data/payslipData';
 import { PayslipItem } from '@/types/payslip';
 
 function App() {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [payslipItems, setPayslipItems] = useState(initialPayslipItems);
@@ -51,7 +54,6 @@ function App() {
     };
     setPayslipItems((items) => [...items, itemWithId]);
     
-    // Afficher les informations dans la console pour copier dans payslipData.ts
     console.log('\n=== NOUVELLE DESCRIPTION À AJOUTER ===');
     console.log('Copiez cet objet dans src/data/payslipData.ts :');
     console.log('\n{');
@@ -64,6 +66,9 @@ function App() {
     console.log('},');
     console.log('\n=====================================\n');
   };
+
+  const resultsCount = filteredItems.length;
+  const resultsText = resultsCount > 1 ? t('results.count_plural') : t('results.count');
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -78,17 +83,18 @@ function App() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
-                    Comprendre ma Fiche de Paie
+                    {t('header.title')}
                   </h1>
                   <p className="text-sm text-muted-foreground">
-                    Explications détaillées de chaque ligne
+                    {t('header.subtitle')}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <LanguageToggle />
                 <AddPayslipDialog onAdd={handleAdd} />
                 <a
-                  href="https://github.com"
+                  href="https://github.com/PetitOursManu/ClearDoc"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-primary transition-colors"
@@ -107,11 +113,10 @@ function App() {
             <div className="mb-12 space-y-8">
               <div className="text-center space-y-4">
                 <h2 className="text-4xl font-bold text-gray-900">
-                  Recherchez un élément de votre fiche de paie
+                  {t('search.title')}
                 </h2>
                 <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                  Utilisez la barre de recherche ou les filtres pour trouver rapidement
-                  l'explication dont vous avez besoin
+                  {t('search.description')}
                 </p>
               </div>
               <SearchBar value={searchQuery} onChange={setSearchQuery} />
@@ -125,7 +130,7 @@ function App() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-2xl font-semibold text-gray-900">
-                  {filteredItems.length} résultat{filteredItems.length > 1 ? 's' : ''}
+                  {resultsCount} {resultsText}
                 </h3>
               </div>
 
@@ -133,9 +138,9 @@ function App() {
                 <div className="text-center py-16">
                   <div className="bg-white rounded-lg p-8 max-w-md mx-auto shadow-sm">
                     <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">Aucun résultat</h3>
+                    <h3 className="text-xl font-semibold mb-2">{t('results.none.title')}</h3>
                     <p className="text-muted-foreground">
-                      Essayez de modifier votre recherche ou vos filtres
+                      {t('results.none.description')}
                     </p>
                   </div>
                 </div>
@@ -155,8 +160,7 @@ function App() {
           <div className="px-4 py-8 max-w-7xl mx-auto">
             <div className="text-center text-muted-foreground">
               <p className="text-sm">
-                © 2024 Comprendre ma Fiche de Paie. Toutes les informations sont
-                fournies à titre indicatif.
+                {t('footer.copyright')}
               </p>
             </div>
           </div>

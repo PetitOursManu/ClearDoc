@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,18 +21,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PayslipItem } from '@/types/payslip';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface AddPayslipDialogProps {
   onAdd: (item: Omit<PayslipItem, 'id'>) => void;
 }
 
-const categoryLabels: Record<string, string> = {
-  salaire: 'Salaire',
-  cotisations: 'Cotisations',
-  net: 'Net à payer',
-  employeur: 'Employeur',
-  autres: 'Autres',
-};
+const categories = [
+  { value: 'salaire', key: 'category.salaire' },
+  { value: 'cotisations', key: 'category.cotisations' },
+  { value: 'net', key: 'category.net' },
+  { value: 'employeur', key: 'category.employeur' },
+  { value: 'autres', key: 'category.autres' },
+];
 
 // ============================================
 // CONFIGURATION : Affichage du bouton d'ajout
@@ -43,37 +44,28 @@ export const SHOW_ADD_BUTTON = true;
 // ============================================
 
 export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [category, setCategory] = useState<PayslipItem['category']>('autres');
+  const [newItem, setNewItem] = useState<Omit<PayslipItem, 'id'>>({
+    title: '',
+    description: '',
+    imageUrl: '',
+    category: 'salaire',
+    keywords: [],
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!title.trim() || !description.trim() || !imageUrl.trim()) {
-      alert('Veuillez remplir tous les champs obligatoires');
-      return;
+  const handleAdd = () => {
+    if (newItem.title && newItem.description) {
+      onAdd(newItem);
+      setNewItem({
+        title: '',
+        description: '',
+        imageUrl: '',
+        category: 'salaire',
+        keywords: [],
+      });
+      setOpen(false);
     }
-
-    // Générer des mots-clés basiques à partir du titre
-    const keywords = title.toLowerCase().split(' ').filter(word => word.length > 2);
-
-    onAdd({
-      title: title.trim(),
-      description: description.trim(),
-      imageUrl: imageUrl.trim(),
-      category,
-      keywords,
-    });
-
-    // Réinitialiser le formulaire
-    setTitle('');
-    setDescription('');
-    setImageUrl('');
-    setCategory('autres');
-    setOpen(false);
   };
 
   if (!SHOW_ADD_BUTTON) {
@@ -83,85 +75,98 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="gap-2 shadow-lg">
-          <Plus className="h-5 w-5" />
-          Ajouter une description
+        <Button className="gap-2">
+          <Plus className="h-4 w-4" />
+          {t('add.button')}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Ajouter une nouvelle description</DialogTitle>
-            <DialogDescription>
-              Remplissez les informations pour créer une nouvelle description de ligne de paie.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="title">
-                Titre <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Indemnité de transport"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="category">
-                Catégorie <span className="text-red-500">*</span>
-              </Label>
-              <Select value={category} onValueChange={(value: PayslipItem['category']) => setCategory(value)}>
-                <SelectTrigger id="category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(categoryLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="imageUrl">
-                URL de l'image <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="imageUrl"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://images.pexels.com/photos/..."
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Utilisez une image de Pexels (800x600 recommandé)
-              </p>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">
-                Description <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Décrivez en détail cette ligne de paie..."
-                rows={5}
-                required
-              />
-            </div>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('add.title')}</DialogTitle>
+          <DialogDescription>
+            {t('add.description')}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="new-title">{t('edit.field.title')}</Label>
+            <Input
+              id="new-title"
+              value={newItem.title}
+              onChange={(e) =>
+                setNewItem({ ...newItem, title: e.target.value })
+              }
+            />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Annuler
-            </Button>
-            <Button type="submit">Ajouter</Button>
-          </DialogFooter>
-        </form>
+          
+          <div className="space-y-2">
+            <Label htmlFor="new-category">{t('edit.field.category')}</Label>
+            <Select
+              value={newItem.category}
+              onValueChange={(value) =>
+                setNewItem({ 
+                  ...newItem, 
+                  category: value as PayslipItem['category']
+                })
+              }
+            >
+              <SelectTrigger id="new-category">
+                <SelectValue placeholder={t('edit.field.categoryPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    {t(cat.key)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="new-imageUrl">{t('edit.field.imageUrl')}</Label>
+            <Input
+              id="new-imageUrl"
+              value={newItem.imageUrl}
+              onChange={(e) =>
+                setNewItem({ ...newItem, imageUrl: e.target.value })
+              }
+              placeholder={t('edit.field.imageUrlPlaceholder')}
+            />
+            {newItem.imageUrl && (
+              <div className="mt-2 rounded-lg overflow-hidden border">
+                <img
+                  src={newItem.imageUrl}
+                  alt={t('edit.field.imagePreview')}
+                  className="w-full h-48 object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      'https://images.pexels.com/photos/6863332/pexels-photo-6863332.jpeg?auto=compress&cs=tinysrgb&w=800';
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="new-description">{t('edit.field.description')}</Label>
+            <Textarea
+              id="new-description"
+              value={newItem.description}
+              onChange={(e) =>
+                setNewItem({ ...newItem, description: e.target.value })
+              }
+              rows={6}
+              className="resize-none"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t('edit.button.cancel')}
+          </Button>
+          <Button onClick={handleAdd}>{t('add.button.add')}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

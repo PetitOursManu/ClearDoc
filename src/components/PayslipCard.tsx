@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PayslipItem } from '@/types/payslip';
 import { Edit, ChevronDown, ChevronUp } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface PayslipCardProps {
   item: PayslipItem;
@@ -16,14 +17,6 @@ const categoryColors: Record<string, string> = {
   net: 'bg-green-500',
   employeur: 'bg-orange-500',
   autres: 'bg-gray-500',
-};
-
-const categoryLabels: Record<string, string> = {
-  salaire: 'Salaire',
-  cotisations: 'Cotisations',
-  net: 'Net à payer',
-  employeur: 'Employeur',
-  autres: 'Autres',
 };
 
 // ============================================
@@ -42,6 +35,7 @@ const DESCRIPTION_CHAR_LIMIT = 150;
 // ============================================
 
 export function PayslipCard({ item, onEdit }: PayslipCardProps) {
+  const { t } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const shouldTruncate = item.description.length > DESCRIPTION_CHAR_LIMIT;
   
@@ -71,7 +65,7 @@ export function PayslipCard({ item, onEdit }: PayslipCardProps) {
         )}
         <div className="absolute bottom-3 left-3">
           <Badge className={`${categoryColors[item.category]} text-white`}>
-            {categoryLabels[item.category]}
+            {t(`category.${item.category}`)}
           </Badge>
         </div>
       </div>
@@ -92,12 +86,12 @@ export function PayslipCard({ item, onEdit }: PayslipCardProps) {
             {isExpanded ? (
               <>
                 <ChevronUp className="h-4 w-4 mr-1" />
-                Voir moins
+                {t('card.seeLess')}
               </>
             ) : (
               <>
                 <ChevronDown className="h-4 w-4 mr-1" />
-                Voir plus
+                {t('card.seeMore')}
               </>
             )}
           </Button>
