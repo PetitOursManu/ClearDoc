@@ -6,6 +6,7 @@ import { PayslipCard } from '@/components/PayslipCard';
 import { EditDialog } from '@/components/EditDialog';
 import { AddPayslipDialog } from '@/components/AddPayslipDialog';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { payslipItems as initialPayslipItems } from '@/data/payslipData';
 import { PayslipItem } from '@/types/payslip';
@@ -71,10 +72,10 @@ function App() {
   const resultsText = resultsCount > 1 ? t('results.count_plural') : t('results.count');
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="flex flex-col min-h-screen w-full max-w-[1400px] mx-auto">
         {/* Header */}
-        <header className="bg-white/80 backdrop-blur-sm border-b sticky top-0 z-10 shadow-sm">
+        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b dark:border-slate-800 sticky top-0 z-10 shadow-sm">
           <div className="px-4 py-6 w-full">
             <div className="flex items-center justify-between max-w-7xl mx-auto">
               <div className="flex items-center gap-3">
@@ -82,7 +83,7 @@ function App() {
                   <FileText className="h-6 w-6 text-primary-foreground" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {t('header.title')}
                   </h1>
                   <p className="text-sm text-muted-foreground">
@@ -91,6 +92,7 @@ function App() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <ThemeToggle />
                 <LanguageToggle />
                 <AddPayslipDialog onAdd={handleAdd} />
                 <a
@@ -112,7 +114,7 @@ function App() {
             {/* Search Section */}
             <div className="mb-12 space-y-8">
               <div className="text-center space-y-4">
-                <h2 className="text-4xl font-bold text-gray-900">
+                <h2 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
                   {t('search.title')}
                 </h2>
                 <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -129,16 +131,16 @@ function App() {
             {/* Results */}
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-semibold text-gray-900">
+                <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                   {resultsCount} {resultsText}
                 </h3>
               </div>
 
               {filteredItems.length === 0 ? (
                 <div className="text-center py-16">
-                  <div className="bg-white rounded-lg p-8 max-w-md mx-auto shadow-sm">
+                  <div className="bg-white dark:bg-slate-900 rounded-lg p-8 max-w-md mx-auto shadow-sm">
                     <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">{t('results.none.title')}</h3>
+                    <h3 className="text-xl font-semibold mb-2 dark:text-gray-100">{t('results.none.title')}</h3>
                     <p className="text-muted-foreground">
                       {t('results.none.description')}
                     </p>
@@ -156,7 +158,7 @@ function App() {
         </main>
 
         {/* Footer */}
-        <footer className="bg-white border-t mt-20">
+        <footer className="bg-white dark:bg-slate-900 border-t dark:border-slate-800 mt-20">
           <div className="px-4 py-8 max-w-7xl mx-auto">
             <div className="text-center text-muted-foreground">
               <p className="text-sm">
