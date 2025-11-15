@@ -1,4 +1,4 @@
-# 📋 Payslip Explainer / Explicateur de Fiche de Paie
+# 📋 ClearDoc
 
 <div align="center">
 
@@ -22,9 +22,15 @@ Une application web moderne pour comprendre et gérer les lignes de votre fiche 
 
 ### 📖 Description
 
-**Payslip Explainer** est une application web interactive conçue pour aider les employés et les professionnels RH à comprendre facilement les différentes lignes d'une fiche de paie. Chaque élément est présenté avec une description détaillée, une image illustrative et une catégorisation claire.
+**ClearDoc** est une application web interactive conçue pour aider les employés et les professionnels RH à comprendre facilement les différentes lignes d'une fiche de paie. Chaque élément est présenté avec une description détaillée, une image illustrative et une catégorisation claire.
 
 L'application offre une interface intuitive avec des fonctionnalités de recherche, de filtrage et de gestion de contenu, le tout dans un design moderne et responsive.
+
+### 📸 Aperçu de l'Application
+
+![ClearDoc Interface en Français](https://i.postimg.cc/xT5M56Dn/Clear-Doc-French.png)
+
+*Interface principale de ClearDoc en français avec recherche, filtres par catégorie et cartes détaillées*
 
 ### ✨ Fonctionnalités Principales
 
@@ -51,6 +57,7 @@ L'application offre une interface intuitive avec des fonctionnalités de recherc
 - **Design responsive** : Optimisé pour mobile, tablette et desktop
 - **Cartes interactives** : Effets de survol et animations fluides
 - **Thème cohérent** : Interface élégante avec shadcn/ui
+- **Interface bilingue** : Basculez facilement entre français et anglais
 
 #### ⚙️ **Configuration Facile**
 - **Toggles de fonctionnalités** : Activez/désactivez les boutons d'édition et d'ajout via des constantes
@@ -61,10 +68,10 @@ L'application offre une interface intuitive avec des fonctionnalités de recherc
 
 ```bash
 # Cloner le repository
-git clone https://github.com/votre-username/payslip-explainer.git
+git clone https://github.com/votre-username/cleardoc.git
 
 # Accéder au dossier
-cd payslip-explainer
+cd cleardoc
 
 # Installer les dépendances
 npm install
@@ -87,12 +94,15 @@ L'application sera accessible sur `http://localhost:5173`
 ### 📁 Structure du Projet
 
 ```
-payslip-explainer/
+cleardoc/
 ├── src/
 │   ├── components/          # Composants React
 │   │   ├── PayslipCard.tsx       # Carte d'affichage
 │   │   ├── AddPayslipDialog.tsx  # Dialog d'ajout
-│   │   └── EditDialog.tsx        # Dialog d'édition
+│   │   ├── EditDialog.tsx        # Dialog d'édition
+│   │   └── Header.tsx            # En-tête avec toggle de langue
+│   ├── contexts/
+│   │   └── LanguageContext.tsx   # Contexte de langue
 │   ├── data/
 │   │   └── payslipData.ts   # Données des fiches de paie
 │   ├── types/
@@ -109,10 +119,7 @@ Consultez le fichier `DOCUMENTATION.md` pour :
 - Activer/désactiver le bouton d'ajout
 - Modifier la limite de caractères pour "Voir plus"
 - Ajouter de nouvelles descriptions manuellement
-
-### 📸 Captures d'écran
-
-*(Ajoutez vos captures d'écran ici)*
+- Personnaliser les traductions
 
 ### 🤝 Contribution
 
@@ -133,9 +140,15 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ### 📖 Description
 
-**Payslip Explainer** is an interactive web application designed to help employees and HR professionals easily understand the different line items on a payslip. Each element is presented with a detailed description, an illustrative image, and clear categorization.
+**ClearDoc** is an interactive web application designed to help employees and HR professionals easily understand the different line items on a payslip. Each element is presented with a detailed description, an illustrative image, and clear categorization.
 
 The application offers an intuitive interface with search, filtering, and content management features, all in a modern and responsive design.
+
+### 📸 Application Preview
+
+![ClearDoc Interface in English](https://i.postimg.cc/WpFsX3Br/Clear-Doc-English.png)
+
+*ClearDoc main interface in English with search, category filters, and detailed cards*
 
 ### ✨ Key Features
 
@@ -162,6 +175,7 @@ The application offers an intuitive interface with search, filtering, and conten
 - **Responsive design**: Optimized for mobile, tablet, and desktop
 - **Interactive cards**: Hover effects and smooth animations
 - **Consistent theme**: Elegant interface with shadcn/ui
+- **Bilingual interface**: Easily switch between French and English
 
 #### ⚙️ **Easy Configuration**
 - **Feature toggles**: Enable/disable edit and add buttons via constants
@@ -172,10 +186,10 @@ The application offers an intuitive interface with search, filtering, and conten
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/payslip-explainer.git
+git clone https://github.com/your-username/cleardoc.git
 
 # Navigate to folder
-cd payslip-explainer
+cd cleardoc
 
 # Install dependencies
 npm install
@@ -198,12 +212,15 @@ The application will be available at `http://localhost:5173`
 ### 📁 Project Structure
 
 ```
-payslip-explainer/
+cleardoc/
 ├── src/
 │   ├── components/          # React components
 │   │   ├── PayslipCard.tsx       # Display card
 │   │   ├── AddPayslipDialog.tsx  # Add dialog
-│   │   └── EditDialog.tsx        # Edit dialog
+│   │   ├── EditDialog.tsx        # Edit dialog
+│   │   └── Header.tsx            # Header with language toggle
+│   ├── contexts/
+│   │   └── LanguageContext.tsx   # Language context
 │   ├── data/
 │   │   └── payslipData.ts   # Payslip data
 │   ├── types/
@@ -220,10 +237,7 @@ See the `DOCUMENTATION.md` file for:
 - Enable/disable add button
 - Modify character limit for "See more"
 - Add new descriptions manually
-
-### 📸 Screenshots
-
-*(Add your screenshots here)*
+- Customize translations
 
 ### 🤝 Contributing
 
