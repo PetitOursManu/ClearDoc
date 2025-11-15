@@ -22,8 +22,6 @@ Une application web moderne pour comprendre et gérer les lignes de votre fiche 
 
 ### 📖 Description
 
-![Screenshot de la version française de ClearDoc.](https://i.postimg.cc/xT5M56Dn/Clear-Doc-French.png)
-
 **Payslip Explainer** est une application web interactive conçue pour aider les employés et les professionnels RH à comprendre facilement les différentes lignes d'une fiche de paie. Chaque élément est présenté avec une description détaillée, une image illustrative et une catégorisation claire.
 
 L'application offre une interface intuitive avec des fonctionnalités de recherche, de filtrage et de gestion de contenu, le tout dans un design moderne et responsive.
@@ -134,8 +132,6 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 ## 🇬🇧 English
 
 ### 📖 Description
-
-![Screenshot de la version française de ClearDoc.](https://i.postimg.cc/WpFsX3Br/Clear-Doc-English.png)
 
 **Payslip Explainer** is an interactive web application designed to help employees and HR professionals easily understand the different line items on a payslip. Each element is presented with a detailed description, an illustrative image, and clear categorization.
 

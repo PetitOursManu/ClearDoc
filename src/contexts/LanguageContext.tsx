@@ -13,8 +13,8 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 const translations = {
   fr: {
     // Header
-    'header.title': 'Comprendre ma Fiche de Paie',
-    'header.subtitle': 'Explications détaillées de chaque ligne',
+    'header.title': 'ClearDoc',
+    'header.subtitle': 'Comprendre ma fiche de paie',
     
     // Search
     'search.title': 'Recherchez un élément de votre fiche de paie',
@@ -59,12 +59,12 @@ const translations = {
     'add.button.add': 'Ajouter',
     
     // Footer
-    'footer.copyright': '© 2024 Comprendre ma Fiche de Paie. Toutes les informations sont fournies à titre indicatif.',
+    'footer.copyright': '© 2024 ClearDoc. Toutes les informations sont fournies à titre indicatif.',
   },
   en: {
     // Header
-    'header.title': 'Understanding My Payslip',
-    'header.subtitle': 'Detailed explanations of each line',
+    'header.title': 'ClearDoc',
+    'header.subtitle': 'Understanding my payslip',
     
     // Search
     'search.title': 'Search for a payslip item',
@@ -109,7 +109,7 @@ const translations = {
     'add.button.add': 'Add',
     
     // Footer
-    'footer.copyright': '© 2024 Understanding My Payslip. All information is provided for informational purposes only.',
+    'footer.copyright': '© 2024 ClearDoc. All information is provided for informational purposes only.',
   },
 };
 
