@@ -8,110 +8,86 @@ interface LanguageContextType {
   t: (key: string) => string;
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
-
 const translations = {
   fr: {
-    // Header
     'header.title': 'ClearDoc',
     'header.subtitle': 'Comprendre ma fiche de paie',
-    
-    // Search
-    'search.title': 'Recherchez un élément de votre fiche de paie',
-    'search.description': 'Utilisez la barre de recherche ou les filtres pour trouver rapidement l\'explication dont vous avez besoin',
-    'search.placeholder': 'Rechercher une ligne de fiche de paie...',
-    
-    // Categories
-    'category.all': 'Tout',
+    'search.title': 'Rechercher une ligne de paie',
+    'search.description': 'Trouvez rapidement des explications sur les différentes lignes de votre fiche de paie',
+    'search.placeholder': 'Rechercher par mot-clé...',
+    'category.all': 'Toutes les catégories',
     'category.salaire': 'Salaire',
     'category.cotisations': 'Cotisations',
-    'category.net': 'Net à payer',
-    'category.employeur': 'Employeur',
+    'category.primes': 'Primes',
+    'category.conges': 'Congés',
     'category.autres': 'Autres',
-    
-    // Results
     'results.count': 'résultat',
     'results.count_plural': 'résultats',
-    'results.none.title': 'Aucun résultat',
-    'results.none.description': 'Essayez de modifier votre recherche ou vos filtres',
-    
-    // Card
-    'card.seeMore': 'Voir plus',
-    'card.seeLess': 'Voir moins',
-    
-    // Edit Dialog
-    'edit.title': 'Modifier l\'élément',
-    'edit.description': 'Modifiez le titre, la catégorie, l\'URL de l\'image et la description de cet élément de fiche de paie.',
-    'edit.field.title': 'Titre',
-    'edit.field.category': 'Catégorie',
-    'edit.field.categoryPlaceholder': 'Sélectionner une catégorie',
-    'edit.field.imageUrl': 'URL de l\'image',
-    'edit.field.imageUrlPlaceholder': 'https://example.com/image.jpg',
-    'edit.field.imagePreview': 'Aperçu',
-    'edit.field.description': 'Description',
-    'edit.button.cancel': 'Annuler',
-    'edit.button.save': 'Enregistrer',
-    
-    // Add Dialog
-    'add.button': 'Ajouter une description',
-    'add.title': 'Ajouter un nouvel élément',
-    'add.description': 'Ajoutez un nouvel élément de fiche de paie avec son titre, sa catégorie, son image et sa description.',
-    'add.button.add': 'Ajouter',
-    
-    // Footer
-    'footer.copyright': '© 2024 ClearDoc. Toutes les informations sont fournies à titre indicatif.',
+    'results.none.title': 'Aucun résultat trouvé',
+    'results.none.description': 'Essayez de modifier vos critères de recherche',
+    'card.edit': 'Modifier',
+    'card.showMore': 'Voir plus',
+    'card.showLess': 'Voir moins',
+    'dialog.edit.title': 'Modifier la description',
+    'dialog.edit.description': 'Modifiez les informations de cette ligne de paie',
+    'dialog.edit.titleLabel': 'Titre',
+    'dialog.edit.descriptionLabel': 'Description',
+    'dialog.edit.categoryLabel': 'Catégorie',
+    'dialog.edit.cancel': 'Annuler',
+    'dialog.edit.save': 'Enregistrer',
+    'dialog.add.title': 'Ajouter une nouvelle description',
+    'dialog.add.description': 'Créez une nouvelle ligne de paie',
+    'dialog.add.button': 'Ajouter',
+    'dialog.add.titleLabel': 'Titre',
+    'dialog.add.descriptionLabel': 'Description',
+    'dialog.add.imageUrlLabel': 'URL de l\'image',
+    'dialog.add.categoryLabel': 'Catégorie',
+    'dialog.add.keywordsLabel': 'Mots-clés (séparés par des virgules)',
+    'dialog.add.cancel': 'Annuler',
+    'dialog.add.save': 'Ajouter',
+    'footer.copyright': '© 2025 ClearDoc. Tous droits réservés.',
   },
   en: {
-    // Header
     'header.title': 'ClearDoc',
     'header.subtitle': 'Understanding my payslip',
-    
-    // Search
-    'search.title': 'Search for a payslip item',
-    'search.description': 'Use the search bar or filters to quickly find the explanation you need',
-    'search.placeholder': 'Search for a payslip line...',
-    
-    // Categories
-    'category.all': 'All',
+    'search.title': 'Search for a payslip line',
+    'search.description': 'Quickly find explanations for different lines on your payslip',
+    'search.placeholder': 'Search by keyword...',
+    'category.all': 'All categories',
     'category.salaire': 'Salary',
     'category.cotisations': 'Contributions',
-    'category.net': 'Net Pay',
-    'category.employeur': 'Employer',
+    'category.primes': 'Bonuses',
+    'category.conges': 'Leave',
     'category.autres': 'Other',
-    
-    // Results
     'results.count': 'result',
     'results.count_plural': 'results',
-    'results.none.title': 'No results',
-    'results.none.description': 'Try modifying your search or filters',
-    
-    // Card
-    'card.seeMore': 'See more',
-    'card.seeLess': 'See less',
-    
-    // Edit Dialog
-    'edit.title': 'Edit Item',
-    'edit.description': 'Edit the title, category, image URL, and description of this payslip item.',
-    'edit.field.title': 'Title',
-    'edit.field.category': 'Category',
-    'edit.field.categoryPlaceholder': 'Select a category',
-    'edit.field.imageUrl': 'Image URL',
-    'edit.field.imageUrlPlaceholder': 'https://example.com/image.jpg',
-    'edit.field.imagePreview': 'Preview',
-    'edit.field.description': 'Description',
-    'edit.button.cancel': 'Cancel',
-    'edit.button.save': 'Save',
-    
-    // Add Dialog
-    'add.button': 'Add Description',
-    'add.title': 'Add New Item',
-    'add.description': 'Add a new payslip item with its title, category, image, and description.',
-    'add.button.add': 'Add',
-    
-    // Footer
-    'footer.copyright': '© 2024 ClearDoc. All information is provided for informational purposes only.',
+    'results.none.title': 'No results found',
+    'results.none.description': 'Try modifying your search criteria',
+    'card.edit': 'Edit',
+    'card.showMore': 'Show more',
+    'card.showLess': 'Show less',
+    'dialog.edit.title': 'Edit description',
+    'dialog.edit.description': 'Edit the information for this payslip line',
+    'dialog.edit.titleLabel': 'Title',
+    'dialog.edit.descriptionLabel': 'Description',
+    'dialog.edit.categoryLabel': 'Category',
+    'dialog.edit.cancel': 'Cancel',
+    'dialog.edit.save': 'Save',
+    'dialog.add.title': 'Add new description',
+    'dialog.add.description': 'Create a new payslip line',
+    'dialog.add.button': 'Add',
+    'dialog.add.titleLabel': 'Title',
+    'dialog.add.descriptionLabel': 'Description',
+    'dialog.add.imageUrlLabel': 'Image URL',
+    'dialog.add.categoryLabel': 'Category',
+    'dialog.add.keywordsLabel': 'Keywords (comma separated)',
+    'dialog.add.cancel': 'Cancel',
+    'dialog.add.save': 'Add',
+    'footer.copyright': '© 2025 ClearDoc. All rights reserved.',
   },
 };
+
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>('fr');

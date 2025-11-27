@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { FileText, Github } from 'lucide-react';
+import { Github } from 'lucide-react';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { PayslipCard } from '@/components/PayslipCard';
@@ -79,8 +79,12 @@ function App() {
           <div className="px-4 py-6 w-full">
             <div className="flex items-center justify-between max-w-7xl mx-auto">
               <div className="flex items-center gap-3">
-                <div className="bg-primary rounded-lg p-2">
-                  <FileText className="h-6 w-6 text-primary-foreground" />
+                <div className="bg-white rounded-lg p-2 shadow-sm">
+                  <img 
+                    src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png" 
+                    alt="ClearDoc Logo" 
+                    className="h-6 w-6 object-contain"
+                  />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -139,7 +143,11 @@ function App() {
               {filteredItems.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="bg-white dark:bg-slate-900 rounded-lg p-8 max-w-md mx-auto shadow-sm">
-                    <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <img 
+                      src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png" 
+                      alt="ClearDoc Logo" 
+                      className="h-16 w-16 mx-auto mb-4 opacity-50 object-contain"
+                    />
                     <h3 className="text-xl font-semibold mb-2 dark:text-gray-100">{t('results.none.title')}</h3>
                     <p className="text-muted-foreground">
                       {t('results.none.description')}
