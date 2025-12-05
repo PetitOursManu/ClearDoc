@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Github, RefreshCw, AlertCircle } from 'lucide-react';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
@@ -21,12 +21,13 @@ function App() {
   const [editingItem, setEditingItem] = useState<PayslipItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Synchroniser les données chargées avec l'état local
-  useState(() => {
+  // Synchroniser automatiquement les données chargées avec l'état local
+  useEffect(() => {
     if (initialPayslipItems.length > 0) {
       setPayslipItems(initialPayslipItems);
+      console.log('✅ Données mises à jour automatiquement:', initialPayslipItems.length, 'éléments');
     }
-  });
+  }, [initialPayslipItems]);
 
   const filteredItems = useMemo(() => {
     return payslipItems.filter((item) => {
@@ -79,9 +80,6 @@ function App() {
 
   const handleRefresh = async () => {
     await refetch();
-    if (initialPayslipItems.length > 0) {
-      setPayslipItems(initialPayslipItems);
-    }
   };
 
   const resultsCount = filteredItems.length;
