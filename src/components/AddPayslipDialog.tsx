@@ -46,8 +46,10 @@ export const SHOW_ADD_BUTTON = true;
 export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedJS, setCopiedJS] = useState(false);
+  const [copiedJSON, setCopiedJSON] = useState(false);
   const [generatedObject, setGeneratedObject] = useState<string>('');
+  const [generatedJSON, setGeneratedJSON] = useState<string>('');
   const [newItem, setNewItem] = useState<Omit<PayslipItem, 'id'>>({
     title: '',
     description: '',
@@ -76,22 +78,43 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
     return objectString;
   };
 
-  const handleCopyToClipboard = () => {
+  const generateJSONString = (item: Omit<PayslipItem, 'id'>) => {
+    const id = `item_${Date.now()}`;
+    const objectWithId = {
+      id,
+      ...item,
+      keywords: item.title.toLowerCase().split(' ')
+    };
+    
+    return JSON.stringify(objectWithId, null, 2);
+  };
+
+  const handleCopyJSToClipboard = () => {
     navigator.clipboard.writeText(generatedObject);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedJS(true);
+    setTimeout(() => setCopiedJS(false), 2000);
+  };
+
+  const handleCopyJSONToClipboard = () => {
+    navigator.clipboard.writeText(generatedJSON);
+    setCopiedJSON(true);
+    setTimeout(() => setCopiedJSON(false), 2000);
   };
 
   const handleAdd = () => {
     if (newItem.title && newItem.description) {
-      // Generate the object string
+      // Generate both object strings
       const objectString = generateObjectString(newItem);
+      const jsonString = generateJSONString(newItem);
       setGeneratedObject(objectString);
+      setGeneratedJSON(jsonString);
       
       // Log to console (keeping existing functionality)
       console.log('=== NOUVEL ÉLÉMENT AJOUTÉ ===');
       console.log('Copiez cet objet dans votre tableau payslipData :');
       console.log(objectString);
+      console.log('Format JSON :');
+      console.log(jsonString);
       console.log('=============================');
       
       // Add the item
@@ -115,7 +138,9 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
       keywords: [],
     });
     setGeneratedObject('');
-    setCopied(false);
+    setGeneratedJSON('');
+    setCopiedJS(false);
+    setCopiedJSON(false);
   };
 
   if (!SHOW_ADD_BUTTON) {
@@ -214,18 +239,18 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
             />
           </div>
 
-          {/* Generated Object Display */}
+          {/* Generated JavaScript Object Display */}
           {generatedObject && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>{t('add.generatedCode')}</Label>
+                <Label>{t('add.generatedCode')} - JavaScript</Label>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCopyToClipboard}
+                  onClick={handleCopyJSToClipboard}
                   className="gap-2"
                 >
-                  {copied ? (
+                  {copiedJS ? (
                     <>
                       <Check className="h-4 w-4" />
                       {t('add.copied')}
@@ -246,10 +271,48 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
                   JavaScript
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                {t('add.codeInstruction')}
-              </p>
             </div>
+          )}
+
+          {/* Generated JSON Display */}
+          {generatedJSON && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t('add.generatedCode')} - JSON</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyJSONToClipboard}
+                  className="gap-2"
+                >
+                  {copiedJSON ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      {t('add.copied')}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      {t('add.copyCode')}
+                    </>
+                  )}
+                </Button>
+              </div>
+              <div className="relative">
+                <pre className="bg-slate-900 text-slate-50 p-4 rounded-lg overflow-x-auto text-sm">
+                  <code>{generatedJSON}</code>
+                </pre>
+                <div className="absolute top-2 right-2 text-xs text-slate-400">
+                  JSON
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(generatedObject || generatedJSON) && (
+            <p className="text-sm text-muted-foreground">
+              {t('add.codeInstruction')}
+            </p>
           )}
         </div>
         <DialogFooter>

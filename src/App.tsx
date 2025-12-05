@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Github } from 'lucide-react';
+import { Github, RefreshCw, AlertCircle } from 'lucide-react';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { PayslipCard } from '@/components/PayslipCard';
@@ -7,17 +7,26 @@ import { EditDialog } from '@/components/EditDialog';
 import { AddPayslipDialog } from '@/components/AddPayslipDialog';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { payslipItems as initialPayslipItems } from '@/data/payslipData';
+import { usePayslipData } from '@/hooks/usePayslipData';
 import { PayslipItem } from '@/types/payslip';
 
 function App() {
   const { t } = useLanguage();
+  const { data: initialPayslipItems, loading, error, refetch } = usePayslipData();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [payslipItems, setPayslipItems] = useState(initialPayslipItems);
+  const [payslipItems, setPayslipItems] = useState<PayslipItem[]>([]);
   const [editingItem, setEditingItem] = useState<PayslipItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Synchroniser les données chargées avec l'état local
+  useState(() => {
+    if (initialPayslipItems.length > 0) {
+      setPayslipItems(initialPayslipItems);
+    }
+  });
 
   const filteredItems = useMemo(() => {
     return payslipItems.filter((item) => {
@@ -56,20 +65,38 @@ function App() {
     setPayslipItems((items) => [...items, itemWithId]);
     
     console.log('\n=== NOUVELLE DESCRIPTION À AJOUTER ===');
-    console.log('Copiez cet objet dans src/data/payslipData.ts :');
+    console.log('Copiez cet objet dans votre fichier JSON :');
     console.log('\n{');
-    console.log(`  id: '${newId}',`);
-    console.log(`  title: '${newItem.title}',`);
-    console.log(`  description: '${newItem.description}',`);
-    console.log(`  imageUrl: '${newItem.imageUrl}',`);
-    console.log(`  category: '${newItem.category}',`);
-    console.log(`  keywords: ${JSON.stringify(newItem.keywords)}`);
+    console.log(`  "id": "${newId}",`);
+    console.log(`  "title": "${newItem.title}",`);
+    console.log(`  "description": "${newItem.description}",`);
+    console.log(`  "imageUrl": "${newItem.imageUrl}",`);
+    console.log(`  "category": "${newItem.category}",`);
+    console.log(`  "keywords": ${JSON.stringify(newItem.keywords)}`);
     console.log('},');
     console.log('\n=====================================\n');
   };
 
+  const handleRefresh = async () => {
+    await refetch();
+    if (initialPayslipItems.length > 0) {
+      setPayslipItems(initialPayslipItems);
+    }
+  };
+
   const resultsCount = filteredItems.length;
   const resultsText = resultsCount > 1 ? t('results.count_plural') : t('results.count');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -96,6 +123,14 @@ function App() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleRefresh}
+                  title="Rafraîchir les données"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
                 <ThemeToggle />
                 <LanguageToggle />
                 <AddPayslipDialog onAdd={handleAdd} />
@@ -111,6 +146,18 @@ function App() {
             </div>
           </div>
         </header>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4">
+            <div className="flex items-center max-w-7xl mx-auto">
+              <AlertCircle className="h-5 w-5 text-yellow-400 mr-2" />
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                {error} - Utilisation des données en cache
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <main className="flex-1 w-full">
