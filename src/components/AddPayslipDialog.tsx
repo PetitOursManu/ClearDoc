@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { PayslipItem } from '@/types/payslip';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { debugLog, debugGroup, debugGroupEnd } from '@/config/debugConfig';
 
 interface AddPayslipDialogProps {
   onAdd: (item: Omit<PayslipItem, 'id'>) => void;
@@ -109,13 +110,13 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
       setGeneratedObject(objectString);
       setGeneratedJSON(jsonString);
       
-      // Log to console (keeping existing functionality)
-      console.log('=== NOUVEL ÉLÉMENT AJOUTÉ ===');
-      console.log('Copiez cet objet dans votre tableau payslipData :');
-      console.log(objectString);
-      console.log('Format JSON :');
-      console.log(jsonString);
-      console.log('=============================');
+      // Log to console only in debug mode
+      debugGroup('=== NOUVEL ÉLÉMENT AJOUTÉ ===');
+      debugLog('Copiez cet objet dans votre tableau payslipData :');
+      debugLog(objectString);
+      debugLog('Format JSON :');
+      debugLog(jsonString);
+      debugGroupEnd();
       
       // Add the item
       onAdd({

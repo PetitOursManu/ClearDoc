@@ -1,385 +1,305 @@
-# Documentation - Configuration de l'Application
+# 📚 Documentation ClearDoc
 
-<div align="center">
+## 🎯 Configuration du Mode Debug
 
-[🇫🇷 Français](#-français) | [🇬🇧 English](#-english)
+### Activation/Désactivation des messages console
 
-</div>
+Par défaut, l'application **n'affiche aucun message dans la console du navigateur** pour une expérience utilisateur propre.
 
----
+Pour activer le mode debug et voir les messages de diagnostic :
 
-## 🇫🇷 Français
+1. **Ouvrez le fichier** : `src/config/debugConfig.ts`
 
-### 🔧 Comment cacher/afficher le bouton d'édition
-
-#### Fichier à modifier
-📁 **`src/components/PayslipCard.tsx`**
-
-#### Ligne à modifier
-Cherchez cette section au début du composant (lignes 26-31) :
+2. **Modifiez la valeur de `DEBUG_MODE`** :
 
 ```typescript
-// ============================================
-// CONFIGURATION : Affichage du bouton d'édition
-// ============================================
-// Pour CACHER le bouton d'édition, changez cette valeur à false
-// Pour AFFICHER le bouton d'édition, changez cette valeur à true
-const SHOW_EDIT_BUTTON = true;
-// ============================================
+// Pour ACTIVER les messages console (mode développement)
+export const DEBUG_MODE = true;
+
+// Pour DÉSACTIVER les messages console (mode production)
+export const DEBUG_MODE = false;
 ```
 
-#### Instructions
+### Messages affichés en mode debug
 
-##### ✅ Pour AFFICHER le bouton d'édition (par défaut)
+Quand `DEBUG_MODE = true`, vous verrez dans la console :
+
+- 🔄 Tentatives de récupération des données
+- ✅ Succès du chargement des données
+- ❌ Erreurs de connexion
+- ⚠️ Utilisation du cache ou des données de fallback
+- 📝 Détails des nouveaux éléments ajoutés
+- 🔍 Informations de débogage diverses
+
+### Fonctions de debug disponibles
+
+Le fichier `debugConfig.ts` fournit plusieurs fonctions wrapper :
+
+- `debugLog()` - Remplace `console.log()`
+- `debugError()` - Remplace `console.error()`
+- `debugWarn()` - Remplace `console.warn()`
+- `debugInfo()` - Remplace `console.info()`
+- `debugTable()` - Remplace `console.table()`
+- `debugGroup()` - Remplace `console.group()`
+- `debugGroupEnd()` - Remplace `console.groupEnd()`
+
+## ⚙️ Configuration des Fonctionnalités
+
+### Afficher/Masquer le bouton d'édition
+
+Dans le fichier `src/components/PayslipCard.tsx`, modifiez :
+
 ```typescript
-const SHOW_EDIT_BUTTON = true;
+// Pour AFFICHER le bouton d'édition
+export const SHOW_EDIT_BUTTON = true;
+
+// Pour MASQUER le bouton d'édition
+export const SHOW_EDIT_BUTTON = false;
 ```
 
-##### ❌ Pour CACHER le bouton d'édition
-```typescript
-const SHOW_EDIT_BUTTON = false;
-```
+### Afficher/Masquer le bouton d'ajout
 
-#### Résultat
-- **`true`** : Le bouton d'édition (crayon) apparaît au survol de chaque carte
-- **`false`** : Le bouton d'édition est complètement masqué
-
----
-
-### ➕ Comment cacher/afficher le bouton d'ajout
-
-#### Fichier à modifier
-📁 **`src/components/AddPayslipDialog.tsx`**
-
-#### Ligne à modifier
-Cherchez cette section au début du composant (lignes 33-38) :
+Dans le fichier `src/components/AddPayslipDialog.tsx`, modifiez :
 
 ```typescript
-// ============================================
-// CONFIGURATION : Affichage du bouton d'ajout
-// ============================================
-// Pour CACHER le bouton d'ajout, changez cette valeur à false
-// Pour AFFICHER le bouton d'ajout, changez cette valeur à true
+// Pour AFFICHER le bouton d'ajout
 export const SHOW_ADD_BUTTON = true;
-// ============================================
-```
 
-#### Instructions
-
-##### ✅ Pour AFFICHER le bouton d'ajout (par défaut)
-```typescript
-export const SHOW_ADD_BUTTON = true;
-```
-
-##### ❌ Pour CACHER le bouton d'ajout
-```typescript
+// Pour MASQUER le bouton d'ajout
 export const SHOW_ADD_BUTTON = false;
 ```
 
----
+### Modifier la limite de caractères pour "Voir plus"
 
-### 📖 Comment modifier la limite de caractères pour "Voir plus"
-
-#### Fichier à modifier
-📁 **`src/components/PayslipCard.tsx`**
-
-#### Ligne à modifier
-Cherchez cette section au début du composant (lignes 40-45) :
+Dans le fichier `src/components/PayslipCard.tsx`, modifiez :
 
 ```typescript
-// ============================================
-// CONFIGURATION : Limite de caractères pour "Voir plus"
-// ============================================
-// Nombre de caractères avant de tronquer la description
-const DESCRIPTION_CHAR_LIMIT = 150;
-// ============================================
+// Nombre de caractères avant d'afficher "Voir plus"
+const DESCRIPTION_CHAR_LIMIT = 150; // Changez cette valeur selon vos besoins
 ```
 
-#### Instructions
+## 🔧 Configuration du Serveur de Données
 
-Modifiez la valeur selon vos besoins :
+### Fichier de configuration
+
+Modifiez le fichier `src/config/apiConfig.ts` :
 
 ```typescript
-const DESCRIPTION_CHAR_LIMIT = 150;  // Par défaut
-const DESCRIPTION_CHAR_LIMIT = 200;  // Plus de texte visible
-const DESCRIPTION_CHAR_LIMIT = 100;  // Moins de texte visible
+export const API_CONFIG = {
+  // URL de votre serveur JSON
+  url: 'https://votre-serveur.com/api/data',
+  
+  // Identifiants Basic Auth
+  auth: {
+    username: 'votre_username',
+    password: 'votre_password'
+  },
+  
+  // Timeout en millisecondes
+  timeout: 10000
+};
 ```
 
-#### Comportement
-- Si la description dépasse la limite, elle sera tronquée avec "..."
-- Un bouton **"Voir plus"** / **"Voir moins"** apparaîtra automatiquement
-- Le bouton permet d'afficher/masquer le texte complet
+### Exemples de configuration
 
----
-
-### 📝 Comment ajouter une nouvelle description manuellement dans le code
-
-#### Méthode 1 : Utiliser l'interface (Recommandé pour tester)
-
-1. Cliquez sur le bouton **"+ Ajouter une description"** dans l'en-tête
-2. Remplissez le formulaire avec :
-   - **Titre** : Le nom de la ligne de paie
-   - **Catégorie** : Choisissez parmi les catégories disponibles
-   - **URL de l'image** : Lien vers une image Pexels (ex: `https://images.pexels.com/photos/...`)
-   - **Description** : Explication détaillée
-3. Cliquez sur **"Ajouter"**
-4. **IMPORTANT** : Ouvrez la console du navigateur (F12)
-5. Copiez l'objet affiché dans la console
-6. Collez-le dans le fichier `src/data/payslipData.ts`
-
-#### Méthode 2 : Ajouter directement dans le code
-
-##### Fichier à modifier
-📁 **`src/data/payslipData.ts`**
-
-##### Étapes
-
-1. Ouvrez le fichier `src/data/payslipData.ts`
-2. Ajoutez un nouvel objet à la fin du tableau `payslipItems` :
-
+#### CouchDB
 ```typescript
-{
-  id: '13', // Incrémentez le dernier ID
-  title: 'Votre titre',
-  description: 'Votre description détaillée...',
-  imageUrl: 'https://images.pexels.com/photos/XXXXX/pexels-photo-XXXXX.jpeg?auto=compress&cs=tinysrgb&w=800',
-  category: 'salaire', // ou 'cotisations', 'net', 'employeur', 'autres'
-  keywords: ['mot1', 'mot2', 'mot3'] // Mots-clés pour la recherche
-}
+url: 'https://couchdb.example.com:5984/database/_all_docs?include_docs=true'
 ```
 
-##### Exemple complet
+#### PouchDB
+```typescript
+url: 'http://localhost:5984/database/_all_docs?include_docs=true'
+```
+
+#### API REST
+```typescript
+url: 'https://api.example.com/v1/payslips'
+```
+
+#### Fichier JSON statique
+```typescript
+url: 'https://cdn.example.com/data/payslips.json'
+```
+
+## 📝 Ajouter des Descriptions Manuellement
+
+### Option 1 : Via l'interface utilisateur
+
+1. Cliquez sur le bouton "Ajouter une description"
+2. Remplissez le formulaire
+3. Le code généré s'affiche automatiquement
+4. Copiez le code JavaScript ou JSON selon vos besoins
+
+### Option 2 : Directement dans le code (données de fallback)
+
+Modifiez le fichier `src/data/fallbackData.ts` :
 
 ```typescript
-export const payslipItems: PayslipItem[] = [
-  // ... éléments existants ...
+export const fallbackPayslipItems: PayslipItem[] = [
   {
-    id: '13',
-    title: 'Indemnité de transport',
-    description: 'L\'indemnité de transport est une aide financière versée par l\'employeur pour couvrir les frais de déplacement domicile-travail. Elle peut être obligatoire selon la convention collective.',
-    imageUrl: 'https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=800',
+    id: 'custom_1',
+    title: 'Nouveau titre',
+    description: 'Description détaillée...',
+    imageUrl: 'https://example.com/image.jpg',
     category: 'salaire',
-    keywords: ['transport', 'déplacement', 'indemnité', 'trajet']
-  }
+    keywords: ['mot1', 'mot2']
+  },
+  // Ajoutez d'autres éléments ici
 ];
 ```
 
-#### Catégories disponibles
-- `'salaire'` : Éléments de rémunération
-- `'cotisations'` : Cotisations sociales
-- `'net'` : Net à payer
-- `'employeur'` : Charges patronales
-- `'autres'` : Autres éléments
+## 🌍 Personnaliser les Traductions
 
-#### Conseils pour les images
-- Utilisez des images de **Pexels** (gratuites et libres de droits)
-- Format recommandé : 800x600 pixels
-- Ajoutez `?auto=compress&cs=tinysrgb&w=800` à la fin de l'URL pour optimiser
+### Modifier les textes de l'interface
 
-#### Note importante
-⚠️ Après modification du fichier `payslipData.ts`, sauvegardez le fichier. Le changement sera automatiquement appliqué grâce au rechargement à chaud (hot reload) de Vite.
-
----
-
-### 🎯 Résumé des configurations
-
-| Fonctionnalité | Fichier | Constante | Valeur par défaut |
-|----------------|---------|-----------|-------------------|
-| Bouton d'édition | `PayslipCard.tsx` | `SHOW_EDIT_BUTTON` | `true` |
-| Bouton d'ajout | `AddPayslipDialog.tsx` | `SHOW_ADD_BUTTON` | `true` |
-| Limite "Voir plus" | `PayslipCard.tsx` | `DESCRIPTION_CHAR_LIMIT` | `150` caractères |
-| Données | `payslipData.ts` | `payslipItems` | 12 éléments |
-
----
-
-## 🇬🇧 English
-
-### 🔧 How to hide/show the edit button
-
-#### File to modify
-📁 **`src/components/PayslipCard.tsx`**
-
-#### Line to modify
-Look for this section at the beginning of the component (lines 26-31):
+Dans le fichier `src/contexts/LanguageContext.tsx`, modifiez l'objet `translations` :
 
 ```typescript
-// ============================================
-// CONFIGURATION: Edit button display
-// ============================================
-// To HIDE the edit button, change this value to false
-// To SHOW the edit button, change this value to true
-const SHOW_EDIT_BUTTON = true;
-// ============================================
+const translations = {
+  fr: {
+    // Modifiez les textes français ici
+    'search.placeholder': 'Votre nouveau texte...',
+  },
+  en: {
+    // Modifiez les textes anglais ici
+    'search.placeholder': 'Your new text...',
+  }
+};
 ```
 
-#### Instructions
+### Ajouter une nouvelle langue
 
-##### ✅ To SHOW the edit button (default)
+1. Ajoutez la langue dans le type :
 ```typescript
-const SHOW_EDIT_BUTTON = true;
+type Language = 'fr' | 'en' | 'es'; // Ajout de l'espagnol
 ```
 
-##### ❌ To HIDE the edit button
+2. Ajoutez les traductions :
 ```typescript
-const SHOW_EDIT_BUTTON = false;
+const translations = {
+  // ...
+  es: {
+    'app.title': 'ClearDoc',
+    'search.placeholder': 'Buscar...',
+    // Ajoutez toutes les traductions
+  }
+};
 ```
 
-#### Result
-- **`true`**: The edit button (pencil) appears on hover over each card
-- **`false`**: The edit button is completely hidden
+## 🔍 Résolution des Problèmes
 
----
+### Les données ne se chargent pas
 
-### ➕ How to hide/show the add button
+1. **Activez le mode debug** : `DEBUG_MODE = true` dans `debugConfig.ts`
+2. **Vérifiez la console** pour les messages d'erreur
+3. **Vérifiez** :
+   - L'URL est correcte et accessible
+   - Les identifiants sont valides
+   - Le serveur autorise les requêtes CORS
+   - Le format JSON est correct
 
-#### File to modify
-📁 **`src/components/AddPayslipDialog.tsx`**
+### Messages console indésirables
 
-#### Line to modify
-Look for this section at the beginning of the component (lines 33-38):
+- Assurez-vous que `DEBUG_MODE = false` dans `src/config/debugConfig.ts`
+- Vérifiez qu'aucune extension de navigateur n'ajoute des logs
 
-```typescript
-// ============================================
-// CONFIGURATION: Add button display
-// ============================================
-// To HIDE the add button, change this value to false
-// To SHOW the add button, change this value to true
-export const SHOW_ADD_BUTTON = true;
-// ============================================
-```
+### L'interface ne se met pas à jour
 
-#### Instructions
+- Vérifiez que les données sont au bon format
+- Utilisez le bouton de rafraîchissement manuel
+- Videz le cache du navigateur si nécessaire
 
-##### ✅ To SHOW the add button (default)
-```typescript
-export const SHOW_ADD_BUTTON = true;
-```
+## 📊 Structure des Données
 
-##### ❌ To HIDE the add button
-```typescript
-export const SHOW_ADD_BUTTON = false;
-```
-
----
-
-### 📖 How to modify the character limit for "See more"
-
-#### File to modify
-📁 **`src/components/PayslipCard.tsx`**
-
-#### Line to modify
-Look for this section at the beginning of the component (lines 40-45):
+### Format PayslipItem
 
 ```typescript
-// ============================================
-// CONFIGURATION: Character limit for "See more"
-// ============================================
-// Number of characters before truncating the description
-const DESCRIPTION_CHAR_LIMIT = 150;
-// ============================================
-```
-
-#### Instructions
-
-Modify the value according to your needs:
-
-```typescript
-const DESCRIPTION_CHAR_LIMIT = 150;  // Default
-const DESCRIPTION_CHAR_LIMIT = 200;  // More visible text
-const DESCRIPTION_CHAR_LIMIT = 100;  // Less visible text
-```
-
-#### Behavior
-- If the description exceeds the limit, it will be truncated with "..."
-- A **"See more"** / **"See less"** button will appear automatically
-- The button allows showing/hiding the full text
-
----
-
-### 📝 How to manually add a new description in the code
-
-#### Method 1: Use the interface (Recommended for testing)
-
-1. Click the **"+ Add description"** button in the header
-2. Fill in the form with:
-   - **Title**: The name of the payslip line
-   - **Category**: Choose from available categories
-   - **Image URL**: Link to a Pexels image (e.g., `https://images.pexels.com/photos/...`)
-   - **Description**: Detailed explanation
-3. Click **"Add"**
-4. **IMPORTANT**: Open the browser console (F12)
-5. Copy the object displayed in the console
-6. Paste it into the `src/data/payslipData.ts` file
-
-#### Method 2: Add directly in the code
-
-##### File to modify
-📁 **`src/data/payslipData.ts`**
-
-##### Steps
-
-1. Open the `src/data/payslipData.ts` file
-2. Add a new object at the end of the `payslipItems` array:
-
-```typescript
-{
-  id: '13', // Increment the last ID
-  title: 'Your title',
-  description: 'Your detailed description...',
-  imageUrl: 'https://images.pexels.com/photos/XXXXX/pexels-photo-XXXXX.jpeg?auto=compress&cs=tinysrgb&w=800',
-  category: 'salaire', // or 'cotisations', 'net', 'employeur', 'autres'
-  keywords: ['word1', 'word2', 'word3'] // Keywords for search
+interface PayslipItem {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  category: 'salaire' | 'cotisations' | 'net' | 'employeur' | 'autres';
+  keywords: string[];
 }
 ```
 
-##### Complete example
+### Catégories disponibles
 
-```typescript
-export const payslipItems: PayslipItem[] = [
-  // ... existing items ...
-  {
-    id: '13',
-    title: 'Transport allowance',
-    description: 'The transport allowance is financial assistance paid by the employer to cover home-to-work travel expenses. It may be mandatory depending on the collective agreement.',
-    imageUrl: 'https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=800',
-    category: 'salaire',
-    keywords: ['transport', 'travel', 'allowance', 'commute']
-  }
-];
+- `salaire` : Éléments de salaire
+- `cotisations` : Cotisations sociales
+- `net` : Net à payer
+- `employeur` : Charges patronales
+- `autres` : Autres éléments
+
+## 🚀 Commandes Utiles
+
+```bash
+# Développement
+npm run dev
+
+# Build de production
+npm run build
+
+# Preview du build
+npm run preview
+
+# Vérification TypeScript
+npm run type-check
+
+# Linting
+npm run lint
 ```
 
-#### Available categories
-- `'salaire'`: Compensation elements
-- `'cotisations'`: Social contributions
-- `'net'`: Net pay
-- `'employeur'`: Employer charges
-- `'autres'`: Other items
+## 📦 Dépendances Principales
 
-#### Tips for images
-- Use **Pexels** images (free and royalty-free)
-- Recommended format: 800x600 pixels
-- Add `?auto=compress&cs=tinysrgb&w=800` at the end of the URL to optimize
+- **React** : Framework UI
+- **TypeScript** : Typage statique
+- **Vite** : Build tool
+- **Tailwind CSS** : Styling
+- **shadcn/ui** : Composants UI
+- **Lucide React** : Icônes
 
-#### Important note
-⚠️ After modifying the `payslipData.ts` file, save the file. The change will be automatically applied thanks to Vite's hot reload feature.
+## 🔐 Sécurité
+
+### Bonnes pratiques
+
+1. **Ne jamais commiter** les identifiants réels dans le code
+2. **Utiliser HTTPS** pour toutes les connexions distantes
+3. **Configurer CORS** correctement sur le serveur
+4. **Utiliser des variables d'environnement** en production
+5. **Désactiver le mode debug** en production (`DEBUG_MODE = false`)
+
+### Variables d'environnement (production)
+
+Créez un fichier `.env` :
+
+```env
+VITE_API_URL=https://api.example.com
+VITE_API_USERNAME=username
+VITE_API_PASSWORD=password
+```
+
+Puis modifiez `apiConfig.ts` :
+
+```typescript
+export const API_CONFIG = {
+  url: import.meta.env.VITE_API_URL || 'fallback-url',
+  auth: {
+    username: import.meta.env.VITE_API_USERNAME || '',
+    password: import.meta.env.VITE_API_PASSWORD || ''
+  }
+};
+```
+
+## 📞 Support
+
+Pour toute question ou problème :
+- Ouvrez une issue sur GitHub
+- Consultez la documentation complète
+- Activez le mode debug pour diagnostiquer les problèmes
 
 ---
 
-### 🎯 Configuration summary
-
-| Feature | File | Constant | Default value |
-|---------|------|----------|---------------|
-| Edit button | `PayslipCard.tsx` | `SHOW_EDIT_BUTTON` | `true` |
-| Add button | `AddPayslipDialog.tsx` | `SHOW_ADD_BUTTON` | `true` |
-| "See more" limit | `PayslipCard.tsx` | `DESCRIPTION_CHAR_LIMIT` | `150` characters |
-| Data | `payslipData.ts` | `payslipItems` | 12 items |
-
----
-
-<div align="center">
-
-**Made with ❤️ for better payslip understanding**
-
-**Fait avec ❤️ pour une meilleure compréhension des fiches de paie**
-
-</div>
+© 2025 ClearDoc. Tous droits réservés.

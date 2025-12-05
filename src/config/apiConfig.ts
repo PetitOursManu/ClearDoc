@@ -3,6 +3,8 @@
 // ============================================
 // Modifiez ces paramètres selon votre configuration serveur
 
+import { debugLog, debugError } from './debugConfig';
+
 export const API_CONFIG = {
   // URL de votre API JSON
   url: 'https://ton-domaine.fr/app/ma_base/mon_document',
@@ -15,9 +17,6 @@ export const API_CONFIG = {
   
   // Timeout en millisecondes (optionnel)
   timeout: 10000,
-  
-  // Activer/désactiver les logs de debug
-  debug: true
 };
 
 // ============================================
@@ -38,9 +37,7 @@ function encodeBasicAuth(username: string, password: string): string {
  */
 export async function getData(): Promise<any> {
   try {
-    if (API_CONFIG.debug) {
-      console.log('🔄 Récupération des données depuis:', API_CONFIG.url);
-    }
+    debugLog('🔄 Récupération des données depuis:', API_CONFIG.url);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
@@ -63,21 +60,19 @@ export async function getData(): Promise<any> {
 
     const data = await response.json();
     
-    if (API_CONFIG.debug) {
-      console.log('✅ Données récupérées avec succès:', data);
-    }
+    debugLog('✅ Données récupérées avec succès:', data);
 
     return data;
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        console.error('❌ Timeout: La requête a pris trop de temps');
+        debugError('❌ Timeout: La requête a pris trop de temps');
         throw new Error('La requête a expiré. Veuillez réessayer.');
       }
-      console.error('❌ Erreur lors de la récupération des données:', error.message);
+      debugError('❌ Erreur lors de la récupération des données:', error.message);
       throw error;
     }
-    console.error('❌ Erreur inconnue:', error);
+    debugError('❌ Erreur inconnue:', error);
     throw new Error('Une erreur inconnue est survenue');
   }
 }
@@ -98,7 +93,7 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
     
     return data;
   } catch (error) {
-    console.warn('⚠️ Utilisation des données en cache ou de fallback');
+    debugLog('⚠️ Utilisation des données en cache ou de fallback');
     
     // Essayer de récupérer depuis le cache
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -107,7 +102,7 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
         try {
           return JSON.parse(cachedData);
         } catch (e) {
-          console.error('Erreur lors de la lecture du cache:', e);
+          debugError('Erreur lors de la lecture du cache:', e);
         }
       }
     }
