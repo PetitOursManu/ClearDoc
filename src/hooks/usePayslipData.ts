@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { PayslipItem } from '@/types/payslip';
 import { getDataWithFallback } from '@/config/apiConfig';
 import { fallbackPayslipItems } from '@/data/fallbackData';
-import { debugLog, debugError } from '@/config/debugConfig';
 
 interface UsePayslipDataReturn {
   data: PayslipItem[];
@@ -49,7 +48,7 @@ export function usePayslipData(): UsePayslipDataReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(errorMessage);
-      debugError('Erreur lors du chargement des données:', errorMessage);
+      console.error('Erreur lors du chargement des données:', errorMessage);
       
       // Utiliser les données de fallback en cas d'erreur
       setData(fallbackPayslipItems);
