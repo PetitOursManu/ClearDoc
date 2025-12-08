@@ -12,7 +12,7 @@ interface PayslipDetailProps {
 }
 
 export function PayslipDetail({ item, onBack }: PayslipDetailProps) {
-  const { t } = useLanguage();
+  const { language } = useLanguage();
 
   useEffect(() => {
     // Scroll to top when component mounts
@@ -27,7 +27,7 @@ export function PayslipDetail({ item, onBack }: PayslipDetailProps) {
         className="mb-6 -ml-2"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
-        {t('card.back') || 'Retour'}
+        {language === 'fr' ? 'Retour à la liste' : 'Back to list'}
       </Button>
 
       <Card className="overflow-hidden">

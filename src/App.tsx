@@ -5,7 +5,6 @@ import { CategoryFilter } from '@/components/CategoryFilter';
 import { PayslipCard } from '@/components/PayslipCard';
 import { PayslipDetail } from '@/components/PayslipDetail';
 import { EditDialog } from '@/components/EditDialog';
-import { AddPayslipDialog } from '@/components/AddPayslipDialog';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -82,27 +81,6 @@ function App() {
     setPayslipItems((items) =>
       items.map((item) => (item.id === updatedItem.id ? updatedItem : item))
     );
-  };
-
-  const handleAdd = (newItem: Omit<PayslipItem, 'id'>) => {
-    const newId = (Math.max(...payslipItems.map(item => parseInt(item.id))) + 1).toString();
-    const itemWithId: PayslipItem = {
-      ...newItem,
-      id: newId,
-    };
-    setPayslipItems((items) => [...items, itemWithId]);
-    
-    console.log('\n=== NOUVELLE DESCRIPTION À AJOUTER ===');
-    console.log('Copiez cet objet dans votre fichier JSON :');
-    console.log('\n{');
-    console.log(`  "id": "${newId}",`);
-    console.log(`  "title": "${newItem.title}",`);
-    console.log(`  "description": "${newItem.description}",`);
-    console.log(`  "imageUrl": "${newItem.imageUrl}",`);
-    console.log(`  "category": "${newItem.category}",`);
-    console.log(`  "keywords": ${JSON.stringify(newItem.keywords)}`);
-    console.log('},');
-    console.log('\n=====================================\n');
   };
 
   const handleRefresh = async () => {
@@ -224,7 +202,6 @@ function App() {
                 </Button>
                 <ThemeToggle />
                 <LanguageToggle />
-                <AddPayslipDialog onAdd={handleAdd} />
                 <a
                   href="https://github.com/PetitOursManu/ClearDoc"
                   target="_blank"

@@ -34,12 +34,6 @@
       "title": "Edit description",
       "save": "Save",
       "cancel": "Cancel"
-    },
-    "add": {
-      "title": "Add a description",
-      "button": "Add",
-      "save": "Add",
-      "cancel": "Cancel"
     }
   },
   "form": {

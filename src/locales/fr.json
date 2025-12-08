@@ -34,12 +34,6 @@
       "title": "Modifier la description",
       "save": "Enregistrer",
       "cancel": "Annuler"
-    },
-    "add": {
-      "title": "Ajouter une description",
-      "button": "Ajouter",
-      "save": "Ajouter",
-      "cancel": "Annuler"
     }
   },
   "form": {
