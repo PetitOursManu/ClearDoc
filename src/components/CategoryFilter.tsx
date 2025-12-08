@@ -10,22 +10,12 @@ interface CategoryFilterProps {
 
 export function CategoryFilter({ selectedCategory, onSelectCategory }: CategoryFilterProps) {
   const { t } = useLanguage();
-  const { categories, loading, error } = useCategories();
+  const { categories, loading } = useCategories();
   
   if (loading) {
     return (
       <div className="flex justify-center py-4">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-4">
-        <p className="text-sm text-muted-foreground">
-          Erreur lors du chargement des catégories. Utilisation des catégories par défaut.
-        </p>
       </div>
     );
   }
@@ -38,7 +28,7 @@ export function CategoryFilter({ selectedCategory, onSelectCategory }: CategoryF
         className="cursor-pointer px-4 py-2 text-sm hover:bg-primary/90 transition-colors"
         onClick={() => onSelectCategory(null)}
       >
-        {t('category.all')}
+        {t('categories.all')}
       </Badge>
       
       {/* Catégories dynamiques */}

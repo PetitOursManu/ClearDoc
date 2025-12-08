@@ -22,6 +22,9 @@ export function usePayslipData(): UsePayslipDataReturn {
     try {
       const result = await getDataWithFallback(fallbackPayslipItems);
       
+      // Vérifier si on utilise les données de fallback (pas d'erreur mais données depuis le cache/fallback)
+      const isUsingFallback = !result._fromServer;
+      
       // Vérifier si le résultat est un tableau
       if (Array.isArray(result)) {
         setData(result);
@@ -44,6 +47,11 @@ export function usePayslipData(): UsePayslipDataReturn {
         }
       } else {
         throw new Error('Aucune donnée reçue');
+      }
+      
+      // Si on utilise le fallback, définir une erreur
+      if (isUsingFallback) {
+        setError('Connexion au serveur impossible');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';

@@ -10,17 +10,32 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePayslipData } from '@/hooks/usePayslipData';
+import { useCategories } from '@/hooks/useCategories';
 import { PayslipItem } from '@/types/payslip';
 
 function App() {
   const { t } = useLanguage();
-  const { data: initialPayslipItems, loading, error, refetch } = usePayslipData();
+  const { data: initialPayslipItems, loading: dataLoading, error: dataError, refetch: refetchData } = usePayslipData();
+  const { error: categoriesError, refetch: refetchCategories } = useCategories();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [payslipItems, setPayslipItems] = useState<PayslipItem[]>([]);
   const [editingItem, setEditingItem] = useState<PayslipItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
+  // Déterminer s'il y a une erreur à afficher
+  const hasError = dataError || categoriesError;
+  const errorMessage = () => {
+    if (dataError && categoriesError) {
+      return 'Impossible de récupérer les données et les catégories - Utilisation des données de secours';
+    } else if (dataError) {
+      return 'Impossible de récupérer les données - Utilisation des données de secours';
+    } else if (categoriesError) {
+      return 'Impossible de récupérer les catégories - Utilisation des catégories par défaut';
+    }
+    return '';
+  };
 
   // Gérer le hash de l'URL
   useEffect(() => {
@@ -84,7 +99,7 @@ function App() {
   };
 
   const handleRefresh = async () => {
-    await refetch();
+    await Promise.all([refetchData(), refetchCategories()]);
   };
 
   const handleBack = () => {
@@ -94,7 +109,7 @@ function App() {
   const resultsCount = filteredItems.length;
   const resultsText = resultsCount > 1 ? t('results.count_plural') : t('results.count');
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center">
         <div className="text-center">
@@ -145,6 +160,20 @@ function App() {
                 </div>
               </div>
             </div>
+            
+            {/* Error Banner */}
+            {hasError && (
+              <div className="bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+                <div className="px-4 py-3 max-w-7xl mx-auto">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                    <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                      {errorMessage()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </header>
 
           {/* Detail View */}
@@ -213,19 +242,21 @@ function App() {
               </div>
             </div>
           </div>
-        </header>
-
-        {/* Error Banner */}
-        {error && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4">
-            <div className="flex items-center max-w-7xl mx-auto">
-              <AlertCircle className="h-5 w-5 text-yellow-400 mr-2" />
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                {error} - Utilisation des données en cache
-              </p>
+          
+          {/* Error Banner */}
+          {hasError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+              <div className="px-4 py-3 max-w-7xl mx-auto">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                  <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                    {errorMessage()}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </header>
 
         {/* Main Content */}
         <main className="flex-1 w-full">

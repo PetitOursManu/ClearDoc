@@ -69,7 +69,8 @@ async function fetchFromAPI(url: string, resourceName: string): Promise<any> {
       console.log(`✅ ${resourceName} récupérées avec succès:`, data);
     }
 
-    return data;
+    // Ajouter un marqueur pour indiquer que les données viennent du serveur
+    return { ...data, _fromServer: true };
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
@@ -123,7 +124,9 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
       const cachedData = localStorage.getItem('payslip_data_cache');
       if (cachedData) {
         try {
-          return JSON.parse(cachedData);
+          const parsed = JSON.parse(cachedData);
+          // Ne pas ajouter _fromServer car ce sont des données en cache
+          return parsed;
         } catch (e) {
           console.error('Erreur lors de la lecture du cache:', e);
         }
@@ -163,7 +166,9 @@ export async function getCategoriesWithFallback(fallbackCategories?: any): Promi
       const cachedData = localStorage.getItem('categories_cache');
       if (cachedData) {
         try {
-          return JSON.parse(cachedData);
+          const parsed = JSON.parse(cachedData);
+          // Ne pas ajouter _fromServer car ce sont des données en cache
+          return parsed;
         } catch (e) {
           console.error('Erreur lors de la lecture du cache des catégories:', e);
         }
