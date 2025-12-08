@@ -3,6 +3,7 @@ import { Github, RefreshCw, AlertCircle } from 'lucide-react';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { PayslipCard } from '@/components/PayslipCard';
+import { PayslipDetail } from '@/components/PayslipDetail';
 import { EditDialog } from '@/components/EditDialog';
 import { AddPayslipDialog } from '@/components/AddPayslipDialog';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -20,6 +21,26 @@ function App() {
   const [payslipItems, setPayslipItems] = useState<PayslipItem[]>([]);
   const [editingItem, setEditingItem] = useState<PayslipItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
+  // Gérer le hash de l'URL
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1); // Enlever le #
+      if (hash) {
+        setSelectedItemId(hash);
+      } else {
+        setSelectedItemId(null);
+      }
+    };
+
+    // Vérifier le hash initial
+    handleHashChange();
+
+    // Écouter les changements de hash
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Synchroniser automatiquement les données chargées avec l'état local
   useEffect(() => {
@@ -28,6 +49,12 @@ function App() {
       console.log('✅ Données mises à jour automatiquement:', initialPayslipItems.length, 'éléments');
     }
   }, [initialPayslipItems]);
+
+  // Trouver l'élément sélectionné
+  const selectedItem = useMemo(() => {
+    if (!selectedItemId) return null;
+    return payslipItems.find(item => item.id === selectedItemId);
+  }, [selectedItemId, payslipItems]);
 
   const filteredItems = useMemo(() => {
     return payslipItems.filter((item) => {
@@ -82,6 +109,10 @@ function App() {
     await refetch();
   };
 
+  const handleBack = () => {
+    window.location.hash = '';
+  };
+
   const resultsCount = filteredItems.length;
   const resultsText = resultsCount > 1 ? t('results.count_plural') : t('results.count');
 
@@ -91,6 +122,68 @@ function App() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si un élément est sélectionné, afficher la vue détaillée
+  if (selectedItem) {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="flex flex-col min-h-screen w-full max-w-[1400px] mx-auto">
+          {/* Header */}
+          <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b dark:border-slate-800 sticky top-0 z-10 shadow-sm">
+            <div className="px-4 py-6 w-full">
+              <div className="flex items-center justify-between max-w-7xl mx-auto">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white rounded-lg p-2 shadow-sm">
+                    <img 
+                      src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png" 
+                      alt="ClearDoc Logo" 
+                      className="h-6 w-6 object-contain"
+                    />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {t('header.title')}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                      {t('header.subtitle')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <ThemeToggle />
+                  <LanguageToggle />
+                  <a
+                    href="https://github.com/PetitOursManu/ClearDoc"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Github className="h-6 w-6" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Detail View */}
+          <main className="flex-1 w-full">
+            <PayslipDetail item={selectedItem} onBack={handleBack} />
+          </main>
+
+          {/* Footer */}
+          <footer className="bg-white dark:bg-slate-900 border-t dark:border-slate-800 mt-20">
+            <div className="px-4 py-8 max-w-7xl mx-auto">
+              <div className="text-center text-muted-foreground">
+                <p className="text-sm">
+                  {t('footer.copyright')}
+                </p>
+              </div>
+            </div>
+          </footer>
         </div>
       </div>
     );

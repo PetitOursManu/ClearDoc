@@ -1,0 +1,55 @@
+{
+  "header": {
+    "title": "ClearDoc",
+    "subtitle": "Understand your payslip"
+  },
+  "search": {
+    "title": "Search for an explanation",
+    "description": "Quickly find clear explanations about your payslip items",
+    "placeholder": "Search for a term..."
+  },
+  "categories": {
+    "all": "All",
+    "salaire": "Salary",
+    "cotisations": "Contributions",
+    "net": "Net",
+    "employeur": "Employer",
+    "autres": "Others"
+  },
+  "results": {
+    "count": "result",
+    "count_plural": "results",
+    "none": {
+      "title": "No results found",
+      "description": "Try with different keywords or select a different category"
+    }
+  },
+  "card": {
+    "seeMore": "See more",
+    "seeLess": "See less",
+    "back": "Back to list"
+  },
+  "dialog": {
+    "edit": {
+      "title": "Edit description",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "add": {
+      "title": "Add a description",
+      "button": "Add",
+      "save": "Add",
+      "cancel": "Cancel"
+    }
+  },
+  "form": {
+    "title": "Title",
+    "description": "Description",
+    "imageUrl": "Image URL",
+    "category": "Category",
+    "keywords": "Keywords (comma separated)"
+  },
+  "footer": {
+    "copyright": "© 2024 ClearDoc. All rights reserved."
+  }
+}

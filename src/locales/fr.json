@@ -1,0 +1,55 @@
+{
+  "header": {
+    "title": "ClearDoc",
+    "subtitle": "Comprendre votre fiche de paie"
+  },
+  "search": {
+    "title": "Rechercher une explication",
+    "description": "Trouvez rapidement des explications claires sur les éléments de votre fiche de paie",
+    "placeholder": "Rechercher un terme..."
+  },
+  "categories": {
+    "all": "Toutes",
+    "salaire": "Salaire",
+    "cotisations": "Cotisations",
+    "net": "Net",
+    "employeur": "Employeur",
+    "autres": "Autres"
+  },
+  "results": {
+    "count": "résultat",
+    "count_plural": "résultats",
+    "none": {
+      "title": "Aucun résultat trouvé",
+      "description": "Essayez avec d'autres mots-clés ou sélectionnez une catégorie différente"
+    }
+  },
+  "card": {
+    "seeMore": "Voir plus",
+    "seeLess": "Voir moins",
+    "back": "Retour à la liste"
+  },
+  "dialog": {
+    "edit": {
+      "title": "Modifier la description",
+      "save": "Enregistrer",
+      "cancel": "Annuler"
+    },
+    "add": {
+      "title": "Ajouter une description",
+      "button": "Ajouter",
+      "save": "Ajouter",
+      "cancel": "Annuler"
+    }
+  },
+  "form": {
+    "title": "Titre",
+    "description": "Description",
+    "imageUrl": "URL de l'image",
+    "category": "Catégorie",
+    "keywords": "Mots-clés (séparés par des virgules)"
+  },
+  "footer": {
+    "copyright": "© 2024 ClearDoc. Tous droits réservés."
+  }
+}
