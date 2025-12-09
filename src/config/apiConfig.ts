@@ -5,10 +5,10 @@
 
 export const API_CONFIG = {
   // URL de votre API JSON pour les données principales
-  dataUrl: 'https://ton-domaine.fr/app/ma_base/mon_document',
+  dataUrl: 'https://couchdb.emanuelvigireux.fr/api/cleardoc/2e21431',
   
   // URL de votre API JSON pour les catégories
-  categoriesUrl: 'https://ton-domaine.fr/app/ma_base/categories',
+  categoriesUrl: 'https://couchdb.emanuelvigireux.fr/api/cleardoc/categories',
   
   // Identifiants pour l'authentification Basic Auth
   auth: {
@@ -20,7 +20,13 @@ export const API_CONFIG = {
   timeout: 10000,
   
   // Activer/désactiver les logs de debug
-  debug: true
+  debug: true,
+  
+  // Mode CORS (si votre serveur nécessite des credentials)
+  corsMode: 'cors' as RequestMode,
+  
+  // Inclure les credentials (cookies, auth headers)
+  includeCredentials: false
 };
 
 // ============================================
@@ -36,6 +42,19 @@ const requestCache = new Map<string, Promise<any>>();
 function encodeBasicAuth(username: string, password: string): string {
   const credentials = `${username}:${password}`;
   return btoa(credentials);
+}
+
+/**
+ * Détecte si l'erreur est une erreur CORS
+ */
+function isCORSError(error: any): boolean {
+  if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+    return true;
+  }
+  if (error.name === 'NetworkError' || error.message.includes('CORS')) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -58,15 +77,24 @@ async function fetchFromAPI(url: string, resourceName: string): Promise<any> {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
 
-      const response = await fetch(url, {
+      // Configuration de la requête
+      const fetchOptions: RequestInit = {
         method: 'GET',
+        mode: API_CONFIG.corsMode,
+        credentials: API_CONFIG.includeCredentials ? 'include' : 'same-origin',
         headers: {
-          'Authorization': `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         },
         signal: controller.signal
-      });
+      };
+
+      // Ajouter l'authentification Basic Auth si configurée
+      if (API_CONFIG.auth.username && API_CONFIG.auth.password) {
+        (fetchOptions.headers as any)['Authorization'] = `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`;
+      }
+
+      const response = await fetch(url, fetchOptions);
 
       clearTimeout(timeoutId);
 
@@ -88,6 +116,19 @@ async function fetchFromAPI(url: string, resourceName: string): Promise<any> {
           console.error(`❌ Timeout: La requête pour ${resourceName} a pris trop de temps`);
           throw new Error('La requête a expiré. Veuillez réessayer.');
         }
+        
+        // Détection spécifique des erreurs CORS
+        if (isCORSError(error)) {
+          console.error(`❌ Erreur CORS détectée pour ${resourceName}`);
+          console.error('ℹ️ Solutions possibles:');
+          console.error('1. Configurez CORS sur votre serveur CouchDB');
+          console.error('2. Utilisez un proxy pour contourner CORS');
+          console.error('3. Hébergez l\'application sur le même domaine que CouchDB');
+          console.error('4. Utilisez les données de fallback en attendant');
+          
+          throw new Error(`Erreur CORS: Le serveur n'autorise pas les requêtes depuis cette origine. Utilisation des données de secours.`);
+        }
+        
         console.error(`❌ Erreur lors de la récupération des ${resourceName}:`, error.message);
         throw error;
       }
@@ -143,7 +184,11 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
     
     return data;
   } catch (error) {
-    console.warn('⚠️ Utilisation des données en cache ou de fallback');
+    if (error instanceof Error && error.message.includes('CORS')) {
+      console.warn('⚠️ Erreur CORS détectée - Utilisation des données de fallback');
+    } else {
+      console.warn('⚠️ Utilisation des données en cache ou de fallback');
+    }
     
     // Essayer de récupérer depuis le cache
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -190,7 +235,11 @@ export async function getCategoriesWithFallback(fallbackCategories?: any): Promi
     
     return data;
   } catch (error) {
-    console.warn('⚠️ Utilisation des catégories en cache ou de fallback');
+    if (error instanceof Error && error.message.includes('CORS')) {
+      console.warn('⚠️ Erreur CORS détectée - Utilisation des catégories de fallback');
+    } else {
+      console.warn('⚠️ Utilisation des catégories en cache ou de fallback');
+    }
     
     // Essayer de récupérer depuis le cache
     if (typeof window !== 'undefined' && window.localStorage) {
