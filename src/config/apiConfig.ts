@@ -27,6 +27,9 @@ export const API_CONFIG = {
 // NE PAS MODIFIER EN DESSOUS DE CETTE LIGNE
 // ============================================
 
+// Cache pour éviter les requêtes multiples
+const requestCache = new Map<string, Promise<any>>();
+
 /**
  * Encode les identifiants en base64 pour Basic Auth
  */
@@ -36,53 +39,72 @@ function encodeBasicAuth(username: string, password: string): string {
 }
 
 /**
- * Fonction générique pour récupérer des données depuis une URL
+ * Fonction générique pour récupérer des données depuis une URL avec cache de requêtes
  */
 async function fetchFromAPI(url: string, resourceName: string): Promise<any> {
-  try {
-    if (API_CONFIG.debug) {
-      console.log(`🔄 Récupération des ${resourceName} depuis:`, url);
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (API_CONFIG.debug) {
-      console.log(`✅ ${resourceName} récupérées avec succès:`, data);
-    }
-
-    // Ajouter un marqueur pour indiquer que les données viennent du serveur
-    return { ...data, _fromServer: true };
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        console.error(`❌ Timeout: La requête pour ${resourceName} a pris trop de temps`);
-        throw new Error('La requête a expiré. Veuillez réessayer.');
-      }
-      console.error(`❌ Erreur lors de la récupération des ${resourceName}:`, error.message);
-      throw error;
-    }
-    console.error('❌ Erreur inconnue:', error);
-    throw new Error('Une erreur inconnue est survenue');
+  // Vérifier si une requête est déjà en cours pour cette URL
+  if (requestCache.has(url)) {
+    console.log(`♻️ Réutilisation de la requête en cours pour ${resourceName}`);
+    return requestCache.get(url);
   }
+
+  // Créer une nouvelle promesse pour cette requête
+  const requestPromise = (async () => {
+    try {
+      if (API_CONFIG.debug) {
+        console.log(`🔄 Récupération des ${resourceName} depuis:`, url);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (API_CONFIG.debug) {
+        console.log(`✅ ${resourceName} récupérées avec succès:`, data);
+      }
+
+      // Ajouter un marqueur pour indiquer que les données viennent du serveur
+      return { ...data, _fromServer: true };
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.error(`❌ Timeout: La requête pour ${resourceName} a pris trop de temps`);
+          throw new Error('La requête a expiré. Veuillez réessayer.');
+        }
+        console.error(`❌ Erreur lors de la récupération des ${resourceName}:`, error.message);
+        throw error;
+      }
+      console.error('❌ Erreur inconnue:', error);
+      throw new Error('Une erreur inconnue est survenue');
+    } finally {
+      // Nettoyer le cache après un délai pour permettre de nouvelles requêtes
+      setTimeout(() => {
+        requestCache.delete(url);
+      }, 100);
+    }
+  })();
+
+  // Stocker la promesse dans le cache
+  requestCache.set(url, requestPromise);
+  
+  return requestPromise;
 }
 
 /**
@@ -111,8 +133,12 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
     
     // Sauvegarder dans le localStorage pour utilisation hors ligne
     if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem('payslip_data_cache', JSON.stringify(data));
-      localStorage.setItem('payslip_data_cache_time', Date.now().toString());
+      try {
+        localStorage.setItem('payslip_data_cache', JSON.stringify(data));
+        localStorage.setItem('payslip_data_cache_time', Date.now().toString());
+      } catch (e) {
+        console.warn('Impossible de sauvegarder dans le localStorage:', e);
+      }
     }
     
     return data;
@@ -121,20 +147,21 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
     
     // Essayer de récupérer depuis le cache
     if (typeof window !== 'undefined' && window.localStorage) {
-      const cachedData = localStorage.getItem('payslip_data_cache');
-      if (cachedData) {
-        try {
+      try {
+        const cachedData = localStorage.getItem('payslip_data_cache');
+        if (cachedData) {
           const parsed = JSON.parse(cachedData);
-          // Ne pas ajouter _fromServer car ce sont des données en cache
+          console.log('📦 Données récupérées depuis le cache local');
           return parsed;
-        } catch (e) {
-          console.error('Erreur lors de la lecture du cache:', e);
         }
+      } catch (e) {
+        console.error('Erreur lors de la lecture du cache:', e);
       }
     }
     
     // Utiliser les données de fallback si fournies
     if (fallbackData) {
+      console.log('📋 Utilisation des données de fallback');
       return fallbackData;
     }
     
@@ -153,8 +180,12 @@ export async function getCategoriesWithFallback(fallbackCategories?: any): Promi
     
     // Sauvegarder dans le localStorage pour utilisation hors ligne
     if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem('categories_cache', JSON.stringify(data));
-      localStorage.setItem('categories_cache_time', Date.now().toString());
+      try {
+        localStorage.setItem('categories_cache', JSON.stringify(data));
+        localStorage.setItem('categories_cache_time', Date.now().toString());
+      } catch (e) {
+        console.warn('Impossible de sauvegarder les catégories dans le localStorage:', e);
+      }
     }
     
     return data;
@@ -163,20 +194,21 @@ export async function getCategoriesWithFallback(fallbackCategories?: any): Promi
     
     // Essayer de récupérer depuis le cache
     if (typeof window !== 'undefined' && window.localStorage) {
-      const cachedData = localStorage.getItem('categories_cache');
-      if (cachedData) {
-        try {
+      try {
+        const cachedData = localStorage.getItem('categories_cache');
+        if (cachedData) {
           const parsed = JSON.parse(cachedData);
-          // Ne pas ajouter _fromServer car ce sont des données en cache
+          console.log('📦 Catégories récupérées depuis le cache local');
           return parsed;
-        } catch (e) {
-          console.error('Erreur lors de la lecture du cache des catégories:', e);
         }
+      } catch (e) {
+        console.error('Erreur lors de la lecture du cache des catégories:', e);
       }
     }
     
     // Utiliser les catégories de fallback si fournies
     if (fallbackCategories) {
+      console.log('📋 Utilisation des catégories de fallback');
       return fallbackCategories;
     }
     
