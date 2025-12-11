@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getCategoriesWithFallback } from '@/config/apiConfig';
 import { Category, CategoriesResponse } from '@/types/category';
+import { requestCache } from '@/services/requestCache';
 
 // Catégories par défaut en cas d'échec du chargement
 const fallbackCategories: CategoriesResponse = {
@@ -33,7 +34,11 @@ export function useCategories(): UseCategoriesReturn {
     setError(null);
     
     try {
-      const result = await getCategoriesWithFallback(fallbackCategories);
+      // Utiliser le cache pour éviter les requêtes multiples
+      const result = await requestCache.fetch(
+        'categories',
+        () => getCategoriesWithFallback(fallbackCategories)
+      );
       
       // Vérifier la structure de la réponse
       if (result && result.categories && Array.isArray(result.categories)) {

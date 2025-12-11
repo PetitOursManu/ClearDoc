@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PayslipItem } from '@/types/payslip';
 import { getDataWithFallback } from '@/config/apiConfig';
 import { fallbackPayslipItems } from '@/data/fallbackData';
+import { requestCache } from '@/services/requestCache';
 
 interface UsePayslipDataReturn {
   data: PayslipItem[];
@@ -20,9 +21,13 @@ export function usePayslipData(): UsePayslipDataReturn {
     setError(null);
     
     try {
-      const result = await getDataWithFallback(fallbackPayslipItems);
+      // Utiliser le cache pour éviter les requêtes multiples
+      const result = await requestCache.fetch(
+        'payslip-data',
+        () => getDataWithFallback(fallbackPayslipItems)
+      );
       
-      // Vérifier si on utilise les données de fallback (pas d'erreur mais données depuis le cache/fallback)
+      // Vérifier si on utilise les données de fallback
       const isUsingFallback = !result._fromServer;
       
       // Vérifier si le résultat est un tableau
