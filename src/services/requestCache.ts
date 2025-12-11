@@ -1,39 +1,92 @@
-// Service singleton pour gérer le cache des requêtes
-class RequestCacheService {
-  private cache: Map<string, Promise<any>> = new Map();
+/**
+ * Service de cache pour les requêtes API
+ * Évite les requêtes multiples simultanées
+ */
 
+interface CacheEntry<T> {
+  promise: Promise<T>;
+  timestamp: number;
+}
+
+class RequestCache {
+  private cache = new Map<string, CacheEntry<any>>();
+  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+
+  /**
+   * Exécute une requête avec mise en cache
+   * @param key Clé unique pour la requête
+   * @param fetcher Fonction qui exécute la requête
+   * @returns Promise avec le résultat
+   */
   async fetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
-    // Si une requête est déjà en cours pour cette clé, retourner la promesse existante
-    if (this.cache.has(key)) {
-      console.log(`⏳ Requête en cache pour ${key}, réutilisation...`);
-      return this.cache.get(key)!;
+    const now = Date.now();
+    const cached = this.cache.get(key);
+
+    // Vérifier si on a une requête en cours ou un cache valide
+    if (cached && (now - cached.timestamp) < this.TTL) {
+      console.log(`♻️ Utilisation du cache pour: ${key}`);
+      return cached.promise;
     }
 
-    // Créer une nouvelle promesse et la stocker
-    const promise = fetcher()
-      .then(result => {
-        // Supprimer du cache après succès
-        this.cache.delete(key);
-        return result;
-      })
-      .catch(error => {
-        // Supprimer du cache après erreur
-        this.cache.delete(key);
-        throw error;
-      });
+    // Créer une nouvelle requête
+    console.log(`🔄 Nouvelle requête pour: ${key}`);
+    const promise = fetcher();
 
-    this.cache.set(key, promise);
+    // Stocker dans le cache
+    this.cache.set(key, {
+      promise,
+      timestamp: now
+    });
+
+    // Nettoyer le cache en cas d'erreur
+    promise.catch(() => {
+      this.cache.delete(key);
+    });
+
     return promise;
   }
 
-  clear(key?: string) {
-    if (key) {
-      this.cache.delete(key);
-    } else {
-      this.cache.clear();
+  /**
+   * Vide le cache pour une clé spécifique
+   */
+  invalidate(key: string): void {
+    this.cache.delete(key);
+    console.log(`🗑️ Cache invalidé pour: ${key}`);
+  }
+
+  /**
+   * Vide tout le cache
+   */
+  clear(): void {
+    this.cache.clear();
+    console.log('🗑️ Cache entièrement vidé');
+  }
+
+  /**
+   * Nettoie les entrées expirées du cache
+   */
+  cleanup(): void {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp >= this.TTL) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`🧹 ${cleaned} entrées expirées supprimées du cache`);
     }
   }
 }
 
-// Instance singleton
-export const requestCache = new RequestCacheService();
+export const requestCache = new RequestCache();
+
+// Nettoyer le cache périodiquement
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    requestCache.cleanup();
+  }, 10 * 60 * 1000); // Toutes les 10 minutes
+}

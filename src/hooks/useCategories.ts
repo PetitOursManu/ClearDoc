@@ -44,6 +44,10 @@ export function useCategories(): UseCategoriesReturn {
       if (result && result.categories && Array.isArray(result.categories)) {
         setCategories(result.categories);
         console.log('✅ Catégories chargées:', result.categories.length);
+      } else if (Array.isArray(result)) {
+        // Si c'est directement un tableau de catégories
+        setCategories(result);
+        console.log('✅ Catégories chargées:', result.length);
       } else {
         throw new Error('Format de catégories non reconnu');
       }

@@ -1,0 +1,35 @@
+{
+  "functions": {
+    "app/**": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "env": {
+    "VITE_COUCHDB_URL": "@couchdb-url",
+    "VITE_COUCHDB_DATABASE": "@couchdb-database", 
+    "VITE_COUCHDB_USERNAME": "@couchdb-username",
+    "VITE_COUCHDB_PASSWORD": "@couchdb-password",
+    "VITE_USE_SEPARATE_FILES": "@use-separate-files",
+    "VITE_DESCRIPTIONS_FILE_URL": "@descriptions-file-url",
+    "VITE_CATEGORIES_FILE_URL": "@categories-file-url",
+    "VITE_DESCRIPTIONS_DATABASE": "@descriptions-database",
+    "VITE_CATEGORIES_DATABASE": "@categories-database",
+    "VITE_DESCRIPTIONS_JSON_URL": "@descriptions-json-url",
+    "VITE_CATEGORIES_JSON_URL": "@categories-json-url"
+  },
+  "build": {
+    "env": {
+      "VITE_COUCHDB_URL": "@couchdb-url",
+      "VITE_COUCHDB_DATABASE": "@couchdb-database",
+      "VITE_COUCHDB_USERNAME": "@couchdb-username", 
+      "VITE_COUCHDB_PASSWORD": "@couchdb-password",
+      "VITE_USE_SEPARATE_FILES": "@use-separate-files",
+      "VITE_DESCRIPTIONS_FILE_URL": "@descriptions-file-url",
+      "VITE_CATEGORIES_FILE_URL": "@categories-file-url",
+      "VITE_DESCRIPTIONS_DATABASE": "@descriptions-database",
+      "VITE_CATEGORIES_DATABASE": "@categories-database",
+      "VITE_DESCRIPTIONS_JSON_URL": "@descriptions-json-url",
+      "VITE_CATEGORIES_JSON_URL": "@categories-json-url"
+    }
+  }
+}

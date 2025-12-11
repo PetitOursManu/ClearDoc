@@ -1,30 +1,113 @@
 // ============================================
-// CONFIGURATION API
+// CONFIGURATION API POUR COUCHDB
 // ============================================
-// Modifiez ces paramètres selon votre configuration serveur
+// Configuration automatique via variables d'environnement
 
 export const API_CONFIG = {
-  // URL de votre API JSON pour les données principales
-  dataUrl: 'https://ton-domaine.fr/app/ma_base/mon_document',
+  // URL de base de votre instance CouchDB
+  baseUrl: import.meta.env.VITE_COUCHDB_URL || 'http://localhost:5984',
   
-  // URL de votre API JSON pour les catégories
-  categoriesUrl: 'https://ton-domaine.fr/app/ma_base/categories',
+  // Nom de la base de données principale
+  database: import.meta.env.VITE_COUCHDB_DATABASE || 'payslips',
   
-  // Identifiants pour l'authentification Basic Auth
+  // Identifiants pour l'authentification
   auth: {
-    username: 'monuser',
-    password: 'monpassword'
+    username: import.meta.env.VITE_COUCHDB_USERNAME || '',
+    password: import.meta.env.VITE_COUCHDB_PASSWORD || ''
   },
   
-  // Timeout en millisecondes (optionnel)
-  timeout: 10000,
+  // Timeout en millisecondes
+  timeout: parseInt(import.meta.env.VITE_COUCHDB_TIMEOUT || '10000'),
   
   // Activer/désactiver les logs de debug
-  debug: true
+  debug: import.meta.env.VITE_COUCHDB_DEBUG === 'true' || import.meta.env.DEV,
+
+  // Configuration pour fichiers séparés
+  useSeparateFiles: import.meta.env.VITE_USE_SEPARATE_FILES === 'true',
+  
+  // Configuration des descriptions
+  descriptions: {
+    // URL directe vers un fichier ou endpoint
+    fileUrl: import.meta.env.VITE_DESCRIPTIONS_FILE_URL,
+    // Base de données séparée
+    database: import.meta.env.VITE_DESCRIPTIONS_DATABASE || 'descriptions',
+    // URL vers un fichier JSON statique
+    jsonUrl: import.meta.env.VITE_DESCRIPTIONS_JSON_URL
+  },
+  
+  // Configuration des catégories
+  categories: {
+    // URL directe vers un fichier ou endpoint
+    fileUrl: import.meta.env.VITE_CATEGORIES_FILE_URL,
+    // Base de données séparée
+    database: import.meta.env.VITE_CATEGORIES_DATABASE || 'categories',
+    // URL vers un fichier JSON statique
+    jsonUrl: import.meta.env.VITE_CATEGORIES_JSON_URL
+  },
+
+  // URLs complètes construites automatiquement
+  get dataUrl() {
+    return `${this.baseUrl}/${this.database}/_all_docs?include_docs=true`;
+  },
+  
+  get categoriesUrl() {
+    // Priorité : URL directe > Base séparée > Vue dans base principale > JSON statique
+    if (this.categories.fileUrl) {
+      return this.categories.fileUrl;
+    }
+    if (this.useSeparateFiles && this.categories.database) {
+      return `${this.baseUrl}/${this.categories.database}/_all_docs?include_docs=true`;
+    }
+    if (this.categories.jsonUrl) {
+      return this.categories.jsonUrl;
+    }
+    return `${this.baseUrl}/${this.database}/_design/categories/_view/all`;
+  },
+
+  get descriptionsUrl() {
+    // Priorité : URL directe > Base séparée > Vue dans base principale > JSON statique
+    if (this.descriptions.fileUrl) {
+      return this.descriptions.fileUrl;
+    }
+    if (this.useSeparateFiles && this.descriptions.database) {
+      return `${this.baseUrl}/${this.descriptions.database}/_all_docs?include_docs=true`;
+    }
+    if (this.descriptions.jsonUrl) {
+      return this.descriptions.jsonUrl;
+    }
+    return `${this.baseUrl}/${this.database}/_design/descriptions/_view/all`;
+  },
+
+  get dbUrl() {
+    return `${this.baseUrl}/${this.database}`;
+  }
 };
 
+// Validation de la configuration
+if (typeof window !== 'undefined') {
+  if (!API_CONFIG.baseUrl || API_CONFIG.baseUrl === 'http://localhost:5984') {
+    console.warn('⚠️ VITE_COUCHDB_URL non configurée, utilisation de localhost');
+  }
+  
+  if (!API_CONFIG.auth.username || !API_CONFIG.auth.password) {
+    console.warn('⚠️ Identifiants CouchDB non configurés');
+  }
+  
+  if (API_CONFIG.debug) {
+    console.log('🔧 Configuration CouchDB:', {
+      baseUrl: API_CONFIG.baseUrl,
+      database: API_CONFIG.database,
+      hasAuth: !!(API_CONFIG.auth.username && API_CONFIG.auth.password),
+      timeout: API_CONFIG.timeout,
+      useSeparateFiles: API_CONFIG.useSeparateFiles,
+      categoriesUrl: API_CONFIG.categoriesUrl,
+      descriptionsUrl: API_CONFIG.descriptionsUrl
+    });
+  }
+}
+
 // ============================================
-// NE PAS MODIFIER EN DESSOUS DE CETTE LIGNE
+// FONCTIONS D'API COUCHDB
 // ============================================
 
 // Cache pour éviter les requêtes multiples
@@ -39,32 +122,43 @@ function encodeBasicAuth(username: string, password: string): string {
 }
 
 /**
- * Fonction générique pour récupérer des données depuis une URL avec cache de requêtes
+ * Fonction générique pour les requêtes CouchDB
  */
-async function fetchFromAPI(url: string, resourceName: string): Promise<any> {
-  // Vérifier si une requête est déjà en cours pour cette URL
-  if (requestCache.has(url)) {
-    console.log(`♻️ Réutilisation de la requête en cours pour ${resourceName}`);
-    return requestCache.get(url);
+async function fetchFromCouchDB(url: string, options: RequestInit = {}): Promise<any> {
+  const cacheKey = `${url}-${JSON.stringify(options)}`;
+  
+  // Vérifier si une requête est déjà en cours
+  if (requestCache.has(cacheKey)) {
+    if (API_CONFIG.debug) {
+      console.log(`♻️ Réutilisation de la requête en cours pour: ${url}`);
+    }
+    return requestCache.get(cacheKey);
   }
 
-  // Créer une nouvelle promesse pour cette requête
   const requestPromise = (async () => {
     try {
       if (API_CONFIG.debug) {
-        console.log(`🔄 Récupération des ${resourceName} depuis:`, url);
+        console.log(`🔄 Requête vers: ${url}`);
       }
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
 
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers
+      };
+
+      // Ajouter l'authentification si configurée et si c'est une URL CouchDB
+      const isCouchDBUrl = url.includes(API_CONFIG.baseUrl);
+      if (isCouchDBUrl && API_CONFIG.auth.username && API_CONFIG.auth.password) {
+        headers['Authorization'] = `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`;
+      }
+
       const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        ...options,
+        headers,
         signal: controller.signal
       });
 
@@ -77,50 +171,133 @@ async function fetchFromAPI(url: string, resourceName: string): Promise<any> {
       const data = await response.json();
       
       if (API_CONFIG.debug) {
-        console.log(`✅ ${resourceName} récupérées avec succès:`, data);
+        console.log(`✅ Réponse reçue de ${url}:`, data);
       }
 
-      // Ajouter un marqueur pour indiquer que les données viennent du serveur
       return { ...data, _fromServer: true };
     } catch (error) {
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          console.error(`❌ Timeout: La requête pour ${resourceName} a pris trop de temps`);
+          console.error(`❌ Timeout: La requête a pris trop de temps`);
           throw new Error('La requête a expiré. Veuillez réessayer.');
         }
-        console.error(`❌ Erreur lors de la récupération des ${resourceName}:`, error.message);
+        console.error(`❌ Erreur lors de la requête:`, error.message);
         throw error;
       }
       console.error('❌ Erreur inconnue:', error);
       throw new Error('Une erreur inconnue est survenue');
     } finally {
-      // Nettoyer le cache après un délai pour permettre de nouvelles requêtes
+      // Nettoyer le cache après un délai
       setTimeout(() => {
-        requestCache.delete(url);
+        requestCache.delete(cacheKey);
       }, 100);
     }
   })();
 
-  // Stocker la promesse dans le cache
-  requestCache.set(url, requestPromise);
-  
+  requestCache.set(cacheKey, requestPromise);
   return requestPromise;
 }
 
 /**
- * Récupère les données principales depuis le serveur distant
- * @returns Promise avec les données JSON
+ * Récupère tous les documents de la base de données principale
  */
 export async function getData(): Promise<any> {
-  return fetchFromAPI(API_CONFIG.dataUrl, 'données');
+  const response = await fetchFromCouchDB(API_CONFIG.dataUrl);
+  
+  // Transformer la réponse CouchDB en format utilisable
+  if (response.rows) {
+    return response.rows.map((row: any) => row.doc).filter((doc: any) => doc && !doc._id.startsWith('_design/'));
+  }
+  
+  return response;
 }
 
 /**
- * Récupère les catégories depuis le serveur distant
- * @returns Promise avec les catégories JSON
+ * Récupère les catégories depuis la source configurée
  */
 export async function getCategories(): Promise<any> {
-  return fetchFromAPI(API_CONFIG.categoriesUrl, 'catégories');
+  try {
+    const response = await fetchFromCouchDB(API_CONFIG.categoriesUrl);
+    
+    // Si c'est un fichier JSON statique, retourner directement
+    if (API_CONFIG.categories.jsonUrl && API_CONFIG.categoriesUrl === API_CONFIG.categories.jsonUrl) {
+      return response;
+    }
+    
+    // Si c'est une réponse CouchDB avec des rows
+    if (response.rows) {
+      return response.rows.map((row: any) => row.doc || row.value).filter((item: any) => item);
+    }
+    
+    return response;
+  } catch (error) {
+    console.warn('Erreur lors du chargement des catégories:', error);
+    return [];
+  }
+}
+
+/**
+ * Récupère les descriptions depuis la source configurée
+ */
+export async function getDescriptions(): Promise<any> {
+  try {
+    const response = await fetchFromCouchDB(API_CONFIG.descriptionsUrl);
+    
+    // Si c'est un fichier JSON statique, retourner directement
+    if (API_CONFIG.descriptions.jsonUrl && API_CONFIG.descriptionsUrl === API_CONFIG.descriptions.jsonUrl) {
+      return response;
+    }
+    
+    // Si c'est une réponse CouchDB avec des rows
+    if (response.rows) {
+      return response.rows.map((row: any) => row.doc || row.value).filter((item: any) => item);
+    }
+    
+    return response;
+  } catch (error) {
+    console.warn('Erreur lors du chargement des descriptions:', error);
+    return [];
+  }
+}
+
+/**
+ * Crée un nouveau document dans la base principale
+ */
+export async function createDocument(doc: any): Promise<any> {
+  const url = API_CONFIG.dbUrl;
+  return fetchFromCouchDB(url, {
+    method: 'POST',
+    body: JSON.stringify(doc)
+  });
+}
+
+/**
+ * Met à jour un document existant
+ */
+export async function updateDocument(id: string, doc: any): Promise<any> {
+  const url = `${API_CONFIG.dbUrl}/${id}`;
+  return fetchFromCouchDB(url, {
+    method: 'PUT',
+    body: JSON.stringify(doc)
+  });
+}
+
+/**
+ * Supprime un document
+ */
+export async function deleteDocument(id: string, rev: string): Promise<any> {
+  const url = `${API_CONFIG.dbUrl}/${id}?rev=${rev}`;
+  return fetchFromCouchDB(url, {
+    method: 'DELETE'
+  });
+}
+
+/**
+ * Récupère un document par son ID
+ */
+export async function getDocument(id: string): Promise<any> {
+  const url = `${API_CONFIG.dbUrl}/${id}`;
+  return fetchFromCouchDB(url);
 }
 
 /**
@@ -128,7 +305,6 @@ export async function getCategories(): Promise<any> {
  */
 export async function getDataWithFallback(fallbackData?: any): Promise<any> {
   try {
-    // Essayer de récupérer depuis le serveur
     const data = await getData();
     
     // Sauvegarder dans le localStorage pour utilisation hors ligne
@@ -165,7 +341,6 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
       return fallbackData;
     }
     
-    // Si aucune donnée disponible, propager l'erreur
     throw error;
   }
 }
@@ -175,10 +350,9 @@ export async function getDataWithFallback(fallbackData?: any): Promise<any> {
  */
 export async function getCategoriesWithFallback(fallbackCategories?: any): Promise<any> {
   try {
-    // Essayer de récupérer depuis le serveur
     const data = await getCategories();
     
-    // Sauvegarder dans le localStorage pour utilisation hors ligne
+    // Sauvegarder dans le localStorage
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         localStorage.setItem('categories_cache', JSON.stringify(data));
@@ -212,7 +386,51 @@ export async function getCategoriesWithFallback(fallbackCategories?: any): Promi
       return fallbackCategories;
     }
     
-    // Si aucune catégorie disponible, propager l'erreur
+    throw error;
+  }
+}
+
+/**
+ * Récupère les descriptions avec gestion du cache et fallback
+ */
+export async function getDescriptionsWithFallback(fallbackDescriptions?: any): Promise<any> {
+  try {
+    const data = await getDescriptions();
+    
+    // Sauvegarder dans le localStorage
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem('descriptions_cache', JSON.stringify(data));
+        localStorage.setItem('descriptions_cache_time', Date.now().toString());
+      } catch (e) {
+        console.warn('Impossible de sauvegarder les descriptions dans le localStorage:', e);
+      }
+    }
+    
+    return data;
+  } catch (error) {
+    console.warn('⚠️ Utilisation des descriptions en cache ou de fallback');
+    
+    // Essayer de récupérer depuis le cache
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const cachedData = localStorage.getItem('descriptions_cache');
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData);
+          console.log('📦 Descriptions récupérées depuis le cache local');
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Erreur lors de la lecture du cache des descriptions:', e);
+      }
+    }
+    
+    // Utiliser les descriptions de fallback si fournies
+    if (fallbackDescriptions) {
+      console.log('📋 Utilisation des descriptions de fallback');
+      return fallbackDescriptions;
+    }
+    
     throw error;
   }
 }

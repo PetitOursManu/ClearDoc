@@ -1,276 +1,178 @@
-# 📋 ClearDoc
+# Application de Gestion des Fiches de Paie
 
-<div align="center">
+Application React/TypeScript pour la gestion des fiches de paie avec base de données CouchDB et support de fichiers séparés.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![React](https://img.shields.io/badge/React-18.3.1-61dafb.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.5.3-3178c6.svg)
-![Vite](https://img.shields.io/badge/Vite-5.4.8-646cff.svg)
+## 🚀 Déploiement sur Vercel
 
-Une application web moderne pour comprendre et gérer les lignes de votre fiche de paie avec navigation par URL.
+### Configuration des variables d'environnement
 
-*A modern web application to understand and manage your payslip line items with URL navigation.*
+1. **Via le Dashboard Vercel :**
+   - Allez dans votre projet Vercel
+   - Onglet "Settings" → "Environment Variables"
+   - Ajoutez les variables suivantes :
 
-[🇫🇷 Français](#-français) | [🇬🇧 English](#-english)
+   **Configuration de base :**
+   ```
+   VITE_COUCHDB_URL=https://votre-instance.couchdb.com
+   VITE_COUCHDB_DATABASE=payslips
+   VITE_COUCHDB_USERNAME=votre-username
+   VITE_COUCHDB_PASSWORD=votre-password
+   VITE_COUCHDB_TIMEOUT=10000
+   VITE_COUCHDB_DEBUG=false
+   ```
 
-</div>
+   **Configuration pour fichiers séparés :**
+   ```
+   VITE_USE_SEPARATE_FILES=true
+   
+   # Option 1: URLs directes vers des endpoints CouchDB
+   VITE_DESCRIPTIONS_FILE_URL=https://votre-instance.couchdb.com/descriptions/_all_docs?include_docs=true
+   VITE_CATEGORIES_FILE_URL=https://votre-instance.couchdb.com/categories/_all_docs?include_docs=true
+   
+   # Option 2: Bases de données séparées
+   VITE_DESCRIPTIONS_DATABASE=descriptions
+   VITE_CATEGORIES_DATABASE=categories
+   
+   # Option 3: Fichiers JSON statiques
+   VITE_DESCRIPTIONS_JSON_URL=https://votre-cdn.com/data/descriptions.json
+   VITE_CATEGORIES_JSON_URL=https://votre-cdn.com/data/categories.json
+   ```
 
----
+2. **Via la CLI Vercel :**
+   ```bash
+   # Configuration de base
+   vercel env add VITE_COUCHDB_URL
+   vercel env add VITE_COUCHDB_DATABASE
+   vercel env add VITE_COUCHDB_USERNAME
+   vercel env add VITE_COUCHDB_PASSWORD
+   
+   # Configuration fichiers séparés
+   vercel env add VITE_USE_SEPARATE_FILES
+   vercel env add VITE_DESCRIPTIONS_FILE_URL
+   vercel env add VITE_CATEGORIES_FILE_URL
+   ```
 
-## 🇫🇷 Français
-
-### 📖 Description
-
-**ClearDoc** est une application web interactive conçue pour aider les employés et les professionnels RH à comprendre facilement les différentes lignes d'une fiche de paie. Les données sont chargées dynamiquement depuis un serveur JSON distant. Chaque élément est accessible via une URL unique et est présenté avec une description détaillée, une image illustrative et une catégorisation claire.
-
-### ✨ Fonctionnalités Principales
-
-#### 🔗 **Navigation par URL**
-- **Liens directs** : Chaque description possède une URL unique (ex: `#1` pour l'ID 1)
-- **Partage facile** : Partagez directement le lien d'une description spécifique
-- **Navigation intuitive** : Cliquez sur une carte pour accéder à sa vue détaillée
-- **Bouton retour** : Retournez facilement à la liste principale
-
-#### 🌐 **Chargement de Données Distant**
-- **Récupération JSON** : Charge les données depuis n'importe quel serveur REST
-- **Cache local** : Sauvegarde automatique pour utilisation hors ligne
-- **Rafraîchissement** : Bouton pour mettre à jour les données manuellement
-- **Gestion d'erreurs** : Fallback automatique en cas d'échec de connexion
-
-#### 🔍 **Recherche et Filtrage**
-- **Recherche en temps réel** : Trouvez instantanément les lignes de paie
-- **Filtrage par catégorie** : 
-  - 💰 Salaire
-  - 🏥 Cotisations sociales
-  - ✅ Net à payer
-  - 🏢 Charges patronales
-  - 📌 Autres éléments
-
-#### 🎨 **Interface Moderne**
-- **Design responsive** : Optimisé pour tous les appareils
-- **Mode sombre** : Basculez entre thème clair et sombre
-- **Bilingue** : Interface disponible en français et anglais
-- **Animations fluides** : Transitions et effets de survol élégants
-
-### 🚀 Installation
+### Déploiement
 
 ```bash
-# Cloner le repository
-git clone https://github.com/PetitOursManu/ClearDoc.git
+# Installer la CLI Vercel
+npm i -g vercel
 
-# Accéder au dossier
-cd ClearDoc
-
-# Installer les dépendances
-npm install
-
-# Lancer le serveur de développement
-npm run dev
+# Déployer
+vercel --prod
 ```
 
-L'application sera accessible sur `http://localhost:5173`
+## 🛠️ Développement local
 
-### 🔧 Configuration
+1. **Installation :**
+   ```bash
+   npm install
+   ```
 
-#### Configuration du serveur de données
+2. **Configuration :**
+   - Copiez `.env.example` vers `.env.local`
+   - Configurez vos variables CouchDB et fichiers séparés
 
-Le fichier de configuration se trouve dans : `src/config/apiConfig.ts`
+3. **Démarrage :**
+   ```bash
+   npm run dev
+   ```
 
-```typescript
-export const API_CONFIG = {
-  url: 'https://votre-serveur.com/api/payslip-data',
-  auth: {
-    username: 'votre_nom_utilisateur',
-    password: 'votre_mot_de_passe'
-  }
-};
-```
+## 📊 Configuration des sources de données
 
-#### Format des données JSON
+### Option 1: Bases de données CouchDB séparées
 
-Votre serveur doit retourner un tableau JSON avec cette structure :
+Créez des bases de données séparées pour les descriptions et catégories :
+- `descriptions` : contient les documents de descriptions
+- `categories` : contient les documents de catégories
 
+### Option 2: Fichiers JSON statiques
+
+Hébergez des fichiers JSON sur un CDN ou serveur statique :
+
+**descriptions.json :**
 ```json
 [
   {
-    "id": "1",
+    "id": "salaire_base",
     "title": "Salaire de base",
-    "description": "Le salaire de base est...",
-    "imageUrl": "https://example.com/image.jpg",
-    "category": "salaire",
-    "keywords": ["salaire", "base"]
+    "description": "Rémunération fixe mensuelle"
   }
 ]
 ```
 
-### 📁 Structure du Projet
-
-```
-ClearDoc/
-├── src/
-│   ├── components/          # Composants React
-│   │   ├── PayslipCard.tsx       # Carte d'affichage
-│   │   ├── PayslipDetail.tsx     # Vue détaillée
-│   │   ├── SearchBar.tsx         # Barre de recherche
-│   │   └── CategoryFilter.tsx    # Filtres par catégorie
-│   ├── config/
-│   │   └── apiConfig.ts     # Configuration API
-│   ├── contexts/
-│   │   └── LanguageContext.tsx   # Gestion multilingue
-│   ├── hooks/
-│   │   └── usePayslipData.ts     # Hook de données
-│   └── App.tsx              # Composant principal
-└── README.md               # Documentation
-```
-
-### 🛠️ Technologies Utilisées
-
-- **React 18.3.1** - Framework UI
-- **TypeScript 5.5.3** - Typage statique
-- **Vite 5.4.8** - Build tool ultra-rapide
-- **Tailwind CSS 3.4.13** - Framework CSS
-- **shadcn/ui** - Composants UI modernes
-- **Lucide React** - Icônes
-
----
-
-## 🇬🇧 English
-
-### 📖 Description
-
-**ClearDoc** is an interactive web application designed to help employees and HR professionals easily understand payslip line items. Data is dynamically loaded from a remote JSON server. Each item is accessible via a unique URL and presented with detailed descriptions, illustrative images, and clear categorization.
-
-### ✨ Key Features
-
-#### 🔗 **URL Navigation**
-- **Direct links**: Each description has a unique URL (e.g., `#1` for ID 1)
-- **Easy sharing**: Share specific description links directly
-- **Intuitive navigation**: Click on a card to access its detailed view
-- **Back button**: Easily return to the main list
-
-#### 🌐 **Remote Data Loading**
-- **JSON fetching**: Load data from any REST server
-- **Local cache**: Automatic saving for offline use
-- **Refresh**: Manual data update button
-- **Error handling**: Automatic fallback on connection failure
-
-#### 🔍 **Search and Filtering**
-- **Real-time search**: Instantly find payslip lines
-- **Category filtering**: 
-  - 💰 Salary
-  - 🏥 Social contributions
-  - ✅ Net pay
-  - 🏢 Employer charges
-  - 📌 Other items
-
-#### 🎨 **Modern Interface**
-- **Responsive design**: Optimized for all devices
-- **Dark mode**: Toggle between light and dark themes
-- **Bilingual**: Interface available in French and English
-- **Smooth animations**: Elegant transitions and hover effects
-
-### 🚀 Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/PetitOursManu/ClearDoc.git
-
-# Navigate to folder
-cd ClearDoc
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-The application will be available at `http://localhost:5173`
-
-### 🔧 Configuration
-
-#### Data server configuration
-
-The configuration file is located at: `src/config/apiConfig.ts`
-
-```typescript
-export const API_CONFIG = {
-  url: 'https://your-server.com/api/payslip-data',
-  auth: {
-    username: 'your_username',
-    password: 'your_password'
-  }
-};
-```
-
-#### JSON data format
-
-Your server must return a JSON array with this structure:
-
+**categories.json :**
 ```json
 [
   {
-    "id": "1",
-    "title": "Base salary",
-    "description": "Base salary is...",
-    "imageUrl": "https://example.com/image.jpg",
-    "category": "salary",
-    "keywords": ["salary", "base"]
+    "id": "salaire",
+    "title": "Salaire"
   }
 ]
 ```
 
-### 📁 Project Structure
+### Option 3: URLs directes CouchDB
 
-```
-ClearDoc/
-├── src/
-│   ├── components/          # React components
-│   │   ├── PayslipCard.tsx       # Display card
-│   │   ├── PayslipDetail.tsx     # Detailed view
-│   │   ├── SearchBar.tsx         # Search bar
-│   │   └── CategoryFilter.tsx    # Category filters
-│   ├── config/
-│   │   └── apiConfig.ts     # API configuration
-│   ├── contexts/
-│   │   └── LanguageContext.tsx   # Multilingual management
-│   ├── hooks/
-│   │   └── usePayslipData.ts     # Data hook
-│   └── App.tsx              # Main component
-└── README.md               # Documentation
+Utilisez des URLs directes vers des endpoints CouchDB spécifiques.
+
+## 🔧 Structure de données
+
+### Documents de descriptions :
+```json
+{
+  "_id": "desc_001",
+  "type": "description",
+  "id": "salaire_base",
+  "title": "Salaire de base",
+  "description": "Rémunération fixe mensuelle",
+  "category": "salaire"
+}
 ```
 
-### 🛠️ Technologies Used
+### Documents de catégories :
+```json
+{
+  "_id": "cat_001",
+  "type": "category",
+  "id": "salaire",
+  "title": "Salaire",
+  "color": "#4CAF50"
+}
+```
 
-- **React 18.3.1** - UI Framework
-- **TypeScript 5.5.3** - Static typing
-- **Vite 5.4.8** - Ultra-fast build tool
-- **Tailwind CSS 3.4.13** - CSS Framework
-- **shadcn/ui** - Modern UI components
-- **Lucide React** - Icons
+## 🔒 Sécurité
 
----
+- Les identifiants CouchDB sont stockés dans les variables d'environnement
+- Authentification Basic Auth avec CouchDB
+- Support des fichiers JSON statiques sans authentification
+- Les variables sensibles ne sont jamais commitées dans Git
 
-### 🤝 Contributing
+## 📱 Fonctionnalités
 
-Contributions are welcome! Feel free to:
-1. Fork the project
-2. Create a branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- ✅ Gestion CRUD des fiches de paie
+- ✅ Support de sources de données multiples
+- ✅ Descriptions et catégories depuis fichiers séparés
+- ✅ Cache local pour mode hors ligne
+- ✅ Recherche et filtrage
+- ✅ Support multilingue (FR/EN)
+- ✅ Mode sombre/clair
+- ✅ Interface responsive
+- ✅ Synchronisation avec CouchDB
 
-### 📄 License
+## 🔧 Technologies
 
-This project is licensed under the MIT License.
+- **Frontend :** React 18, TypeScript, Vite
+- **UI :** Tailwind CSS, shadcn/ui
+- **Base de données :** CouchDB (multiple sources)
+- **Déploiement :** Vercel
+- **État :** React Context API
 
----
+## 📋 Priorité des sources de données
 
-<div align="center">
+L'application utilise la priorité suivante pour charger les données :
 
-**Made with ❤️ for better payslip understanding**
-
-[⬆ Back to top](#-cleardoc)
-
-</div>
+1. **URL directe** (`VITE_*_FILE_URL`)
+2. **Base de données séparée** (`VITE_*_DATABASE`)
+3. **Fichier JSON statique** (`VITE_*_JSON_URL`)
+4. **Vue dans base principale** (fallback)
+5. **Données par défaut** (en cas d'erreur)
