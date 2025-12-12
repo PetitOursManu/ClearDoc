@@ -144,16 +144,31 @@ async function fetchFromCouchDB(url: string, options: RequestInit = {}): Promise
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
 
-      const headers: HeadersInit = {
+      // Créer un objet headers typé correctement
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers
+        'Accept': 'application/json'
       };
+
+      // Ajouter les headers personnalisés s'ils existent
+      if (options.headers) {
+        if (options.headers instanceof Headers) {
+          options.headers.forEach((value, key) => {
+            headers[key] = value;
+          });
+        } else if (Array.isArray(options.headers)) {
+          options.headers.forEach(([key, value]) => {
+            headers[key] = value;
+          });
+        } else {
+          Object.assign(headers, options.headers);
+        }
+      }
 
       // Ajouter l'authentification si configurée et si c'est une URL CouchDB
       const isCouchDBUrl = url.includes(API_CONFIG.baseUrl);
       if (isCouchDBUrl && API_CONFIG.auth.username && API_CONFIG.auth.password) {
-        headers['Authorization'] = `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`;
+        headers.Authorization = `Basic ${encodeBasicAuth(API_CONFIG.auth.username, API_CONFIG.auth.password)}`;
       }
 
       const response = await fetch(url, {
