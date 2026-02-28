@@ -2,19 +2,20 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Edit, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Edit, Trash2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { PayslipItem } from '@/types/payslip';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const SHOW_EDIT_BUTTON = false;
 const DESCRIPTION_CHAR_LIMIT = 150;
 
 interface PayslipCardProps {
   item: PayslipItem;
   onEdit: (item: PayslipItem) => void;
+  onDelete?: (item: PayslipItem) => void;
+  isAdmin?: boolean;
 }
 
-export function PayslipCard({ item, onEdit }: PayslipCardProps) {
+export function PayslipCard({ item, onEdit, onDelete, isAdmin = false }: PayslipCardProps) {
   const { t } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const shouldTruncate = item.description.length > DESCRIPTION_CHAR_LIMIT;
@@ -23,16 +24,12 @@ export function PayslipCard({ item, onEdit }: PayslipCardProps) {
     : item.description;
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Empêcher la navigation si on clique sur un bouton
-    if ((e.target as HTMLElement).closest('button')) {
-      return;
-    }
-    // Naviguer vers la vue détaillée
+    if ((e.target as HTMLElement).closest('button')) return;
     window.location.hash = item.id;
   };
 
   return (
-    <Card 
+    <Card
       className="overflow-hidden hover:shadow-lg transition-all duration-200 dark:bg-slate-900 dark:border-slate-800 cursor-pointer hover:scale-[1.02]"
       onClick={handleCardClick}
     >
@@ -59,18 +56,26 @@ export function PayslipCard({ item, onEdit }: PayslipCardProps) {
               <span className="text-xs text-muted-foreground">ID: {item.id}</span>
             </div>
           </div>
-          {SHOW_EDIT_BUTTON && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(item);
-              }}
-              className="shrink-0"
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
+          {isAdmin && (
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                title="Modifier"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => { e.stopPropagation(); onDelete?.(item); }}
+                title="Supprimer"
+                className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -82,20 +87,13 @@ export function PayslipCard({ item, onEdit }: PayslipCardProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
+            onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
             className="mt-2 p-0 h-auto font-normal text-primary hover:text-primary/80 dark:text-blue-400 dark:hover:text-blue-300"
           >
             {isExpanded ? (
-              <>
-                {t('card.seeLess')} <ChevronUp className="ml-1 h-4 w-4" />
-              </>
+              <>{t('card.seeLess')} <ChevronUp className="ml-1 h-4 w-4" /></>
             ) : (
-              <>
-                {t('card.seeMore')} <ChevronDown className="ml-1 h-4 w-4" />
-              </>
+              <>{t('card.seeMore')} <ChevronDown className="ml-1 h-4 w-4" /></>
             )}
           </Button>
         )}

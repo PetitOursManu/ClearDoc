@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Github, RefreshCw, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Github, RefreshCw, AlertCircle, Plus, LogOut, Shield } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { PayslipCard } from '@/components/PayslipCard';
@@ -9,12 +11,25 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePayslipData } from '@/hooks/usePayslipData';
 import { useCategories } from '@/hooks/useCategories';
 import { PayslipItem } from '@/types/payslip';
+import { createDocument, updateDocument, deleteDocument } from '@/config/apiConfig';
+
+const EMPTY_ITEM: PayslipItem = {
+  id: '',
+  title: '',
+  description: '',
+  imageUrl: '',
+  category: 'autres',
+  keywords: [],
+};
 
 function App() {
   const { t } = useLanguage();
+  const { isAdmin, username, logout } = useAuth();
+  const navigate = useNavigate();
   const { data: initialPayslipItems, loading: dataLoading, error: dataError, refetch: refetchData } = usePayslipData();
   const { error: categoriesError, refetch: refetchCategories } = useCategories();
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,78 +39,103 @@ function App() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  // Déterminer s'il y a une erreur à afficher
   const hasError = dataError || categoriesError;
   const errorMessage = () => {
-    if (dataError && categoriesError) {
-      return 'Impossible de récupérer les données et les catégories - Utilisation des données de secours';
-    } else if (dataError) {
-      return 'Impossible de récupérer les données - Utilisation des données de secours';
-    } else if (categoriesError) {
-      return 'Impossible de récupérer les catégories - Utilisation des catégories par défaut';
-    }
+    if (dataError && categoriesError) return 'Impossible de récupérer les données et les catégories - Utilisation des données de secours';
+    if (dataError) return 'Impossible de récupérer les données - Utilisation des données de secours';
+    if (categoriesError) return 'Impossible de récupérer les catégories - Utilisation des catégories par défaut';
     return '';
   };
 
-  // Gérer le hash de l'URL
+  // Gestion du hash de l'URL pour la vue détaillée
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.slice(1); // Enlever le #
-      if (hash) {
-        setSelectedItemId(hash);
-      } else {
-        setSelectedItemId(null);
-      }
+      const hash = window.location.hash.slice(1);
+      setSelectedItemId(hash || null);
     };
-
-    // Vérifier le hash initial
     handleHashChange();
-
-    // Écouter les changements de hash
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Synchroniser automatiquement les données chargées avec l'état local
+  // Synchronisation des données chargées
   useEffect(() => {
     if (initialPayslipItems.length > 0) {
       setPayslipItems(initialPayslipItems);
-      console.log('✅ Données mises à jour automatiquement:', initialPayslipItems.length, 'éléments');
     }
   }, [initialPayslipItems]);
 
-  // Trouver l'élément sélectionné
-  const selectedItem = useMemo(() => {
-    if (!selectedItemId) return null;
-    return payslipItems.find(item => item.id === selectedItemId);
-  }, [selectedItemId, payslipItems]);
+  const selectedItem = useMemo(
+    () => payslipItems.find(item => item.id === selectedItemId) ?? null,
+    [selectedItemId, payslipItems]
+  );
 
   const filteredItems = useMemo(() => {
-    return payslipItems.filter((item) => {
+    return payslipItems.filter(item => {
       const matchesSearch =
         searchQuery === '' ||
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.keywords.some((keyword) =>
-          keyword.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-
-      const matchesCategory =
-        selectedCategory === null || item.category === selectedCategory;
-
+        item.keywords.some(k => k.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesCategory = selectedCategory === null || item.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [payslipItems, searchQuery, selectedCategory]);
+
+  // ============ Handlers admin ============
 
   const handleEdit = (item: PayslipItem) => {
     setEditingItem(item);
     setDialogOpen(true);
   };
 
-  const handleSave = (updatedItem: PayslipItem) => {
-    setPayslipItems((items) =>
-      items.map((item) => (item.id === updatedItem.id ? updatedItem : item))
-    );
+  const handleAdd = () => {
+    setEditingItem({ ...EMPTY_ITEM });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async (updatedItem: PayslipItem) => {
+    if (isAdmin) {
+      try {
+        if (!editingItem?.id) {
+          // Création
+          const newItem = { ...updatedItem, id: uuidv4() };
+          await createDocument(newItem);
+          setPayslipItems(items => [newItem, ...items]);
+        } else {
+          // Mise à jour
+          await updateDocument(editingItem.id, updatedItem);
+          setPayslipItems(items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+        if (msg.includes('401') || msg.includes('authentifi') || msg.includes('expiré')) {
+          navigate('/admin/login');
+        }
+      }
+    } else {
+      setPayslipItems(items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
+    }
+  };
+
+  const handleDelete = async (item: PayslipItem) => {
+    if (!isAdmin) return;
+    if (!window.confirm(`Supprimer "${item.title}" ? Cette action est irréversible.`)) return;
+
+    try {
+      await deleteDocument(item.id);
+      setPayslipItems(items => items.filter(i => i.id !== item.id));
+      if (selectedItemId === item.id) window.location.hash = '';
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      if (msg.includes('401') || msg.includes('authentifi') || msg.includes('expiré')) {
+        navigate('/admin/login');
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
   };
 
   const handleRefresh = async () => {
@@ -120,75 +160,95 @@ function App() {
     );
   }
 
-  // Si un élément est sélectionné, afficher la vue détaillée
+  // ============ Header commun ============
+
+  const headerContent = (
+    <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b dark:border-slate-800 sticky top-0 z-10 shadow-sm">
+      <div className="px-4 py-6 w-full">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="bg-white rounded-lg p-2 shadow-sm">
+              <img
+                src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png"
+                alt="ClearDoc Logo"
+                className="h-6 w-6 object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {t('header.title')}
+              </h1>
+              <p className="text-sm text-muted-foreground">{t('header.subtitle')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!selectedItem && (
+              <Button variant="outline" size="icon" onClick={handleRefresh} title="Rafraîchir">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            )}
+            <ThemeToggle />
+            <LanguageToggle />
+            {isAdmin ? (
+              <>
+                <span className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground px-2 py-1 bg-muted rounded-md">
+                  <Shield className="h-3 w-3" />
+                  {username}
+                </span>
+                <Button variant="outline" size="sm" onClick={handleLogout} title="Déconnexion">
+                  <LogOut className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Déconnexion</span>
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/admin/login')}
+                title="Accès administrateur"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Shield className="h-4 w-4" />
+              </Button>
+            )}
+            <a
+              href="https://github.com/PetitOursManu/ClearDoc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Github className="h-6 w-6" />
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {hasError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+          <div className="px-4 py-3 max-w-7xl mx-auto">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+              <p className="text-sm font-medium text-red-800 dark:text-red-300">{errorMessage()}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+
+  // ============ Vue détaillée ============
+
   if (selectedItem) {
     return (
       <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="flex flex-col min-h-screen w-full max-w-[1400px] mx-auto">
-          {/* Header */}
-          <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b dark:border-slate-800 sticky top-0 z-10 shadow-sm">
-            <div className="px-4 py-6 w-full">
-              <div className="flex items-center justify-between max-w-7xl mx-auto">
-                <div className="flex items-center gap-3">
-                  <div className="bg-white rounded-lg p-2 shadow-sm">
-                    <img 
-                      src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png" 
-                      alt="ClearDoc Logo" 
-                      className="h-6 w-6 object-contain"
-                    />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                      {t('header.title')}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                      {t('header.subtitle')}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <ThemeToggle />
-                  <LanguageToggle />
-                  <a
-                    href="https://github.com/PetitOursManu/ClearDoc"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <Github className="h-6 w-6" />
-                  </a>
-                </div>
-              </div>
-            </div>
-            
-            {/* Error Banner */}
-            {hasError && (
-              <div className="bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
-                <div className="px-4 py-3 max-w-7xl mx-auto">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-                    <p className="text-sm font-medium text-red-800 dark:text-red-300">
-                      {errorMessage()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </header>
-
-          {/* Detail View */}
+          {headerContent}
           <main className="flex-1 w-full">
             <PayslipDetail item={selectedItem} onBack={handleBack} />
           </main>
-
-          {/* Footer */}
           <footer className="bg-white dark:bg-slate-900 border-t dark:border-slate-800 mt-20">
-            <div className="px-4 py-8 max-w-7xl mx-auto">
-              <div className="text-center text-muted-foreground">
-                <p className="text-sm">
-                  {t('footer.copyright')}
-                </p>
-              </div>
+            <div className="px-4 py-8 max-w-7xl mx-auto text-center text-muted-foreground">
+              <p className="text-sm">{t('footer.copyright')}</p>
             </div>
           </footer>
         </div>
@@ -196,72 +256,15 @@ function App() {
     );
   }
 
+  // ============ Vue liste ============
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="flex flex-col min-h-screen w-full max-w-[1400px] mx-auto">
-        {/* Header */}
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b dark:border-slate-800 sticky top-0 z-10 shadow-sm">
-          <div className="px-4 py-6 w-full">
-            <div className="flex items-center justify-between max-w-7xl mx-auto">
-              <div className="flex items-center gap-3">
-                <div className="bg-white rounded-lg p-2 shadow-sm">
-                  <img 
-                    src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png" 
-                    alt="ClearDoc Logo" 
-                    className="h-6 w-6 object-contain"
-                  />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {t('header.title')}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    {t('header.subtitle')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleRefresh}
-                  title="Rafraîchir les données"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <ThemeToggle />
-                <LanguageToggle />
-                <a
-                  href="https://github.com/PetitOursManu/ClearDoc"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Github className="h-6 w-6" />
-                </a>
-              </div>
-            </div>
-          </div>
-          
-          {/* Error Banner */}
-          {hasError && (
-            <div className="bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
-              <div className="px-4 py-3 max-w-7xl mx-auto">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-                  <p className="text-sm font-medium text-red-800 dark:text-red-300">
-                    {errorMessage()}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </header>
+        {headerContent}
 
-        {/* Main Content */}
         <main className="flex-1 w-full">
           <div className="px-4 py-12 max-w-7xl mx-auto">
-            {/* Search Section */}
             <div className="mb-12 space-y-8">
               <div className="text-center space-y-4">
                 <h2 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
@@ -272,38 +275,44 @@ function App() {
                 </p>
               </div>
               <SearchBar value={searchQuery} onChange={setSearchQuery} />
-              <CategoryFilter
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
-              />
+              <CategoryFilter selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} isAdmin={isAdmin} />
             </div>
 
-            {/* Results */}
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                   {resultsCount} {resultsText}
                 </h3>
+                {isAdmin && (
+                  <Button onClick={handleAdd} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Ajouter une entrée
+                  </Button>
+                )}
               </div>
 
               {filteredItems.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="bg-white dark:bg-slate-900 rounded-lg p-8 max-w-md mx-auto shadow-sm">
-                    <img 
-                      src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png" 
-                      alt="ClearDoc Logo" 
+                    <img
+                      src="https://i.postimg.cc/YCNJPVd6/Clear-Doc.png"
+                      alt="ClearDoc Logo"
                       className="h-16 w-16 mx-auto mb-4 opacity-50 object-contain"
                     />
                     <h3 className="text-xl font-semibold mb-2 dark:text-gray-100">{t('results.none.title')}</h3>
-                    <p className="text-muted-foreground">
-                      {t('results.none.description')}
-                    </p>
+                    <p className="text-muted-foreground">{t('results.none.description')}</p>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredItems.map((item) => (
-                    <PayslipCard key={item.id} item={item} onEdit={handleEdit} />
+                  {filteredItems.map(item => (
+                    <PayslipCard
+                      key={item.id}
+                      item={item}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      isAdmin={isAdmin}
+                    />
                   ))}
                 </div>
               )}
@@ -311,18 +320,12 @@ function App() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="bg-white dark:bg-slate-900 border-t dark:border-slate-800 mt-20">
-          <div className="px-4 py-8 max-w-7xl mx-auto">
-            <div className="text-center text-muted-foreground">
-              <p className="text-sm">
-                {t('footer.copyright')}
-              </p>
-            </div>
+          <div className="px-4 py-8 max-w-7xl mx-auto text-center text-muted-foreground">
+            <p className="text-sm">{t('footer.copyright')}</p>
           </div>
         </footer>
 
-        {/* Edit Dialog */}
         <EditDialog
           item={editingItem}
           open={dialogOpen}

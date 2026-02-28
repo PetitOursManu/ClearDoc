@@ -1,315 +1,183 @@
-# Application de Gestion des Fiches de Paie
+# ClearDoc
 
-Application React/TypeScript pour la gestion des fiches de paie avec base de données CouchDB et support de fichiers séparés.
+Application React/TypeScript pour stocker et consulter des descriptions textuelles de fiches de paie. Chaque entrée possède un identifiant unique, un titre, une description, une catégorie, des mots-clés et une image optionnelle.
 
-## 🚀 Déploiement sur Vercel
+## Stack technique
 
-### Configuration des variables d'environnement
+- **Frontend :** React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui
+- **Backend :** Node.js, Express
+- **Base de données :** SQLite (`data/cleardoc.db`)
+- **Auth :** JWT (cookie httpOnly) + bcrypt
+- **Environnement cible :** Debian / Yunohost
 
-L'application supporte deux modes de configuration :
+## Prérequis
 
-#### **Mode 1 : Configuration de base (une seule base CouchDB)**
-
-Variables **obligatoires** :
-```bash
-VITE_COUCHDB_URL=https://votre-instance.couchdb.com          # URL complète de votre instance CouchDB
-VITE_COUCHDB_DATABASE=payslips                               # Nom de la base de données (string)
-VITE_COUCHDB_USERNAME=votre-username                         # Nom d'utilisateur CouchDB (string)
-VITE_COUCHDB_PASSWORD=votre-password                         # Mot de passe CouchDB (string)
-```
-
-Variables **optionnelles** :
-```bash
-VITE_COUCHDB_TIMEOUT=10000                                   # Timeout en millisecondes (number, défaut: 10000)
-VITE_COUCHDB_DEBUG=false                                     # Activer les logs debug (boolean, défaut: false)
-```
-
-#### **Mode 2 : Configuration avec fichiers séparés**
-
-Variables **obligatoires de base** (identiques au Mode 1) :
-```bash
-VITE_COUCHDB_URL=https://votre-instance.couchdb.com
-VITE_COUCHDB_DATABASE=payslips
-VITE_COUCHDB_USERNAME=votre-username
-VITE_COUCHDB_PASSWORD=votre-password
-```
-
-Variable **d'activation** :
-```bash
-VITE_USE_SEPARATE_FILES=true                                 # Active le mode fichiers séparés (boolean)
-```
-
-**Choisissez UNE des 3 options suivantes pour chaque type de données :**
-
-##### **Option A : URLs directes vers endpoints CouchDB**
-```bash
-# URLs complètes vers des endpoints CouchDB spécifiques (string)
-VITE_DESCRIPTIONS_FILE_URL=https://votre-instance.couchdb.com/descriptions/_all_docs?include_docs=true
-VITE_CATEGORIES_FILE_URL=https://votre-instance.couchdb.com/categories/_all_docs?include_docs=true
-```
-
-##### **Option B : Bases de données CouchDB séparées**
-```bash
-# Noms des bases de données séparées (string)
-VITE_DESCRIPTIONS_DATABASE=descriptions
-VITE_CATEGORIES_DATABASE=categories
-```
-
-##### **Option C : Fichiers JSON statiques**
-```bash
-# URLs vers des fichiers JSON hébergés sur CDN/serveur statique (string)
-VITE_DESCRIPTIONS_JSON_URL=https://votre-cdn.com/data/descriptions.json
-VITE_CATEGORIES_JSON_URL=https://votre-cdn.com/data/categories.json
-```
-
-### Configuration via Dashboard Vercel
-
-1. **Allez dans votre projet Vercel**
-2. **Onglet "Settings" → "Environment Variables"**
-3. **Ajoutez les variables selon votre mode choisi :**
-
-**Pour le Mode 1 (base simple) :**
-| Variable | Type | Exemple | Description |
-|----------|------|---------|-------------|
-| `VITE_COUCHDB_URL` | string | `https://admin:pass@instance.couchdb.com` | URL complète avec auth |
-| `VITE_COUCHDB_DATABASE` | string | `payslips` | Nom de la base |
-| `VITE_COUCHDB_USERNAME` | string | `admin` | Utilisateur CouchDB |
-| `VITE_COUCHDB_PASSWORD` | string | `motdepasse123` | Mot de passe |
-| `VITE_COUCHDB_TIMEOUT` | number | `15000` | Timeout (optionnel) |
-| `VITE_COUCHDB_DEBUG` | boolean | `true` | Debug mode (optionnel) |
-
-**Pour le Mode 2 (fichiers séparés) :**
-Ajoutez toutes les variables du Mode 1, plus :
-
-| Variable | Type | Exemple | Description |
-|----------|------|---------|-------------|
-| `VITE_USE_SEPARATE_FILES` | boolean | `true` | Active le mode séparé |
-
-**Puis choisissez UNE option :**
-
-**Option A - URLs directes :**
-| Variable | Type | Exemple |
-|----------|------|---------|
-| `VITE_DESCRIPTIONS_FILE_URL` | string | `https://instance.com/descriptions/_all_docs?include_docs=true` |
-| `VITE_CATEGORIES_FILE_URL` | string | `https://instance.com/categories/_all_docs?include_docs=true` |
-
-**Option B - Bases séparées :**
-| Variable | Type | Exemple |
-|----------|------|---------|
-| `VITE_DESCRIPTIONS_DATABASE` | string | `descriptions` |
-| `VITE_CATEGORIES_DATABASE` | string | `categories` |
-
-**Option C - JSON statiques :**
-| Variable | Type | Exemple |
-|----------|------|---------|
-| `VITE_DESCRIPTIONS_JSON_URL` | string | `https://cdn.example.com/descriptions.json` |
-| `VITE_CATEGORIES_JSON_URL` | string | `https://cdn.example.com/categories.json` |
-
-### Configuration via CLI Vercel
+- Node.js 18+
+- `build-essential` et `python3` (requis par `better-sqlite3` pour la compilation native)
 
 ```bash
-# Installation de la CLI
-npm i -g vercel
-
-# Configuration Mode 1 (base simple)
-vercel env add VITE_COUCHDB_URL
-vercel env add VITE_COUCHDB_DATABASE
-vercel env add VITE_COUCHDB_USERNAME
-vercel env add VITE_COUCHDB_PASSWORD
-
-# Configuration Mode 2 (fichiers séparés)
-# Ajoutez d'abord toutes les variables du Mode 1, puis :
-vercel env add VITE_USE_SEPARATE_FILES
-
-# Option A - URLs directes
-vercel env add VITE_DESCRIPTIONS_FILE_URL
-vercel env add VITE_CATEGORIES_FILE_URL
-
-# OU Option B - Bases séparées
-vercel env add VITE_DESCRIPTIONS_DATABASE
-vercel env add VITE_CATEGORIES_DATABASE
-
-# OU Option C - JSON statiques
-vercel env add VITE_DESCRIPTIONS_JSON_URL
-vercel env add VITE_CATEGORIES_JSON_URL
-
-# Déploiement
-vercel --prod
+apt install build-essential python3
 ```
 
-## 🛠️ Développement local
+## Installation
 
-1. **Installation :**
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-2. **Configuration :**
-   ```bash
-   # Copiez le fichier d'exemple
-   cp .env.example .env.local
-   
-   # Éditez .env.local avec vos valeurs
-   nano .env.local
-   ```
+## Configuration
 
-3. **Démarrage :**
-   ```bash
-   npm run dev
-   ```
+Créez un fichier `.env` à la racine (jamais commité) :
 
-## 📊 Structure des données selon le mode
+```bash
+JWT_SECRET=votre_secret_tres_long_et_aleatoire
+PORT=3001
+```
 
-### Mode 1 : Base unique
+Optionnel :
 
-Toutes les données sont dans une seule base CouchDB `payslips` :
+```bash
+VITE_API_URL=          # Laisser vide en production (même serveur)
+VITE_API_TIMEOUT=10000 # Timeout des requêtes en ms
+```
+
+## Première utilisation
+
+### 1. Créer le compte administrateur
+
+```bash
+npm run setup-admin
+```
+
+Ce script interactif demande un identifiant et un mot de passe (min. 8 caractères). Il ne doit être lancé qu'une seule fois. Pour remplacer le compte existant, relancez-le et confirmez.
+
+### 2. Démarrer le serveur
+
+```bash
+npm run server
+# ou en production :
+npm start
+```
+
+Le serveur crée automatiquement au premier démarrage :
+- `data/cleardoc.db` — base SQLite
+- `data/uploads/` — dossier des images uploadées
+
+### 3. Démarrer le frontend (développement)
+
+```bash
+npm run dev
+```
+
+Le frontend Vite est accessible sur `http://localhost:5173`. Les appels `/api` et `/uploads` sont proxifiés automatiquement vers Express (`http://localhost:3001`).
+
+## Production
+
+```bash
+npm run build   # compile le frontend dans dist/
+npm start       # Express sert dist/ + API sur le port 3001
+```
+
+En production, Express sert à la fois le frontend buildé et l'API depuis le même port.
+
+## Structure des données
+
+### Schéma SQLite
+
+| Table | Colonnes |
+|---|---|
+| `documents` | `id`, `title`, `description`, `image_path`, `category`, `keywords`, `created_at`, `updated_at` |
+| `categories` | `id`, `title` |
+| `descriptions` | `id`, `title`, `description` |
+| `admin_users` | `id`, `username`, `password_hash`, `created_at` |
+| `login_logs` | `id`, `username`, `success`, `ip`, `logged_at` |
+| `login_attempts` | `ip`, `count`, `blocked_until` |
+
+### Catégories par défaut
+
+Insérées automatiquement au premier démarrage : `salaire`, `cotisations`, `net`, `employeur`, `autres`.
+
+### Format d'un document
 
 ```json
 {
-  "_id": "payslip_001",
-  "type": "payslip",
-  "employee": "John Doe",
-  "items": [...]
-}
-```
-
-### Mode 2 : Fichiers séparés
-
-#### Option A : URLs directes CouchDB
-- Endpoints CouchDB spécifiques
-- Authentification automatique
-- Format : `https://instance.com/db/_all_docs?include_docs=true`
-
-#### Option B : Bases CouchDB séparées
-
-**Base `descriptions` :**
-```json
-{
-  "_id": "desc_001",
-  "type": "description",
-  "id": "salaire_base",
+  "id": "uuid",
   "title": "Salaire de base",
-  "description": "Rémunération fixe mensuelle"
+  "description": "Rémunération fixe mensuelle définie par le contrat de travail.",
+  "imageUrl": "/uploads/fichier.jpg",
+  "category": "salaire",
+  "keywords": ["salaire", "brut", "fixe"]
 }
 ```
 
-**Base `categories` :**
-```json
-{
-  "_id": "cat_001",
-  "type": "category",
-  "id": "salaire",
-  "title": "Salaire",
-  "color": "#4CAF50"
-}
-```
-
-#### Option C : Fichiers JSON statiques
-
-**descriptions.json :**
-```json
-[
-  {
-    "id": "salaire_base",
-    "title": "Salaire de base",
-    "description": "Rémunération fixe mensuelle"
-  },
-  {
-    "id": "heures_sup",
-    "title": "Heures supplémentaires",
-    "description": "Heures travaillées au-delà de la durée légale"
-  }
-]
-```
-
-**categories.json :**
-```json
-[
-  {
-    "id": "salaire",
-    "title": "Salaire"
-  },
-  {
-    "id": "cotisations",
-    "title": "Cotisations"
-  }
-]
-```
-
-## 🔄 Priorité de chargement des données
-
-L'application utilise cette priorité pour charger descriptions et catégories :
-
-1. **URL directe** (`VITE_*_FILE_URL`) - Priorité maximale
-2. **Base de données séparée** (`VITE_*_DATABASE`) - Si `VITE_USE_SEPARATE_FILES=true`
-3. **Fichier JSON statique** (`VITE_*_JSON_URL`) - Fallback externe
-4. **Vue dans base principale** - Fallback CouchDB
-5. **Données par défaut** - Fallback ultime
-
-## 🔒 Sécurité
-
-### Variables sensibles
-- `VITE_COUCHDB_USERNAME` et `VITE_COUCHDB_PASSWORD` : **Ne jamais commiter**
-- Utilisez les variables d'environnement Vercel pour la production
-- Le fichier `.env.local` est ignoré par Git
+## API
 
 ### Authentification
-- **CouchDB** : Basic Auth automatique pour URLs CouchDB
-- **JSON statiques** : Aucune authentification (public)
-- **CORS** : Configurez votre CouchDB pour autoriser votre domaine
 
-## 📱 Fonctionnalités
+| Méthode | Route | Description |
+|---|---|---|
+| `POST` | `/api/auth/login` | Connexion (cookie httpOnly JWT 1h) |
+| `POST` | `/api/auth/logout` | Déconnexion |
+| `GET` | `/api/auth/me` | Vérification du token |
 
-- ✅ **Gestion CRUD** des fiches de paie
-- ✅ **Sources multiples** : CouchDB, JSON statiques, URLs directes
-- ✅ **Cache local** pour mode hors ligne
-- ✅ **Fallback automatique** en cas d'erreur
-- ✅ **Recherche et filtrage** avancés
-- ✅ **Interface responsive** mobile/desktop
-- ✅ **Mode sombre/clair**
-- ✅ **Support multilingue** (FR/EN)
+### Documents (lecture publique, écriture protégée)
 
-## 🔧 Technologies
+| Méthode | Route | Auth |
+|---|---|---|
+| `GET` | `/api/documents` | Non |
+| `GET` | `/api/documents/:id` | Non |
+| `POST` | `/api/documents` | Oui |
+| `PUT` | `/api/documents/:id` | Oui |
+| `DELETE` | `/api/documents/:id` | Oui |
 
-- **Frontend :** React 18, TypeScript, Vite
-- **UI :** Tailwind CSS, shadcn/ui
-- **Base de données :** CouchDB (flexible)
-- **Déploiement :** Vercel
-- **État :** React Context + Hooks personnalisés
+### Upload
 
-## 🚨 Dépannage
+| Méthode | Route | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/upload` | Oui | Champ `image` (multipart), 10 Mo max |
 
-### Erreurs courantes
+Les images sont stockées dans `data/uploads/` et servies via `/uploads/fichier.jpg`.
 
-**"Connexion au serveur impossible"**
-- Vérifiez `VITE_COUCHDB_URL`
-- Testez l'URL dans votre navigateur
-- Vérifiez les identifiants
+### Catégories et descriptions
 
-**"Format de données non reconnu"**
-- Vérifiez la structure de vos fichiers JSON
-- Consultez les logs avec `VITE_COUCHDB_DEBUG=true`
+| Méthode | Route | Auth |
+|---|---|---|
+| `GET` | `/api/categories` | Non |
+| `PUT` | `/api/categories` | Oui |
+| `GET` | `/api/descriptions` | Non |
+| `POST` | `/api/descriptions` | Oui |
+| `PUT` | `/api/descriptions/:id` | Oui |
+| `DELETE` | `/api/descriptions/:id` | Oui |
 
-**"CORS Error"**
-- Configurez CORS sur votre serveur CouchDB
-- Ajoutez votre domaine Vercel aux origines autorisées
+## Sécurité
 
-### Logs de debug
+- Mots de passe hashés avec **bcrypt** (coût 12)
+- Token JWT stocké en **cookie httpOnly** (inaccessible au JavaScript)
+- **5 tentatives de connexion** maximum par IP, blocage 15 minutes
+- Toutes les connexions (réussies ou non) sont loggées en base avec date, heure et IP
+- Expiration automatique du token après **1 heure** avec redirection vers `/admin/login`
+- Le cookie est `secure` en production (HTTPS uniquement)
 
-Activez les logs détaillés :
-```bash
-VITE_COUCHDB_DEBUG=true
-```
+## Interface admin
 
-Les logs montrent :
-- URLs utilisées pour chaque source
-- Réponses des serveurs
-- Fallbacks activés
-- Erreurs détaillées
+Un bouton discret (icône bouclier) dans le header redirige vers `/admin/login`.
 
-## 📞 Support
+Une fois connecté :
+- Un indicateur avec le nom d'utilisateur apparaît dans le header
+- Un bouton **Déconnexion** est visible
+- Les cartes affichent des boutons **Modifier** et **Supprimer**
+- Un bouton **Ajouter une entrée** apparaît dans la liste
 
-Pour des questions spécifiques :
-1. Vérifiez les logs avec `VITE_COUCHDB_DEBUG=true`
-2. Testez vos URLs manuellement
-3. Vérifiez la structure de vos données JSON
+## Données persistantes
+
+Le dossier `data/` (base SQLite + images) est ajouté au `.gitignore` et ne sera jamais écrasé par un `git pull` ou une mise à jour du code.
+
+## Scripts disponibles
+
+| Commande | Description |
+|---|---|
+| `npm run dev` | Frontend Vite en développement (port 5173) |
+| `npm run build` | Compilation TypeScript + build Vite |
+| `npm run server` | Serveur Express (port 3001) |
+| `npm start` | Alias de `npm run server` |
+| `npm run setup-admin` | Création du compte administrateur (interactif) |

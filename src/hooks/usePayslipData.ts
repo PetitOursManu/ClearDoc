@@ -61,8 +61,7 @@ export function usePayslipData(): UsePayslipDataReturn {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
       setError(errorMessage);
-      console.error('Erreur lors du chargement des données:', errorMessage);
-      
+
       // Utiliser les données de fallback en cas d'erreur
       setData(fallbackPayslipItems);
     } finally {

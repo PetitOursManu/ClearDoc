@@ -15,7 +15,7 @@ const translations = {
     'search.title': 'Rechercher une ligne de paie',
     'search.description': 'Trouvez rapidement des explications sur les différentes lignes de votre fiche de paie',
     'search.placeholder': 'Rechercher par mot-clé...',
-    'category.all': 'Toutes les catégories',
+    'category.all': 'Tous',
     'category.salaire': 'Salaire',
     'category.cotisations': 'Cotisations',
     'category.net': 'Net',

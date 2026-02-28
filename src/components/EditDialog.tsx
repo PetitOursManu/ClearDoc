@@ -19,7 +19,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PayslipItem } from '@/types/payslip';
+import { Category } from '@/types/category';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getCategories } from '@/config/apiConfig';
+
+const fallbackCategories: Category[] = [
+  { id: 'salaire', title: 'Salaire' },
+  { id: 'cotisations', title: 'Cotisations' },
+  { id: 'net', title: 'Net' },
+  { id: 'employeur', title: 'Employeur' },
+  { id: 'autres', title: 'Autres' },
+];
 
 interface EditDialogProps {
   item: PayslipItem | null;
@@ -28,17 +38,22 @@ interface EditDialogProps {
   onSave: (item: PayslipItem) => void;
 }
 
-const categories = [
-  { value: 'salaire', key: 'category.salaire' },
-  { value: 'cotisations', key: 'category.cotisations' },
-  { value: 'net', key: 'category.net' },
-  { value: 'employeur', key: 'category.employeur' },
-  { value: 'autres', key: 'category.autres' },
-];
-
 export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps) {
   const { t } = useLanguage();
+  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
   const [editedItem, setEditedItem] = useState<PayslipItem | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      getCategories()
+        .then(data => {
+          if (data?.categories && Array.isArray(data.categories)) {
+            setCategories(data.categories);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [open]);
 
   useEffect(() => {
     if (item) {
@@ -81,9 +96,9 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
             <Select
               value={editedItem.category}
               onValueChange={(value) =>
-                setEditedItem({ 
-                  ...editedItem, 
-                  category: value as PayslipItem['category']
+                setEditedItem({
+                  ...editedItem,
+                  category: value
                 })
               }
             >
@@ -92,8 +107,8 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    {t(cat.key)}
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.title}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -3,6 +3,6 @@ export interface PayslipItem {
   title: string;
   description: string;
   imageUrl: string;
-  category: 'salaire' | 'cotisations' | 'net' | 'employeur' | 'autres';
+  category: string;
   keywords: string[];
 }

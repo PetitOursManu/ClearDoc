@@ -4,8 +4,5 @@ export interface Category {
 }
 
 export interface CategoriesResponse {
-  _id: string;
-  _rev: string;
-  type: string;
   categories: Category[];
 }

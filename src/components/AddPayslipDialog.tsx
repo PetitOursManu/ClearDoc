@@ -109,14 +109,6 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
       setGeneratedObject(objectString);
       setGeneratedJSON(jsonString);
       
-      // Log to console (keeping existing functionality)
-      console.log('=== NOUVEL ÉLÉMENT AJOUTÉ ===');
-      console.log('Copiez cet objet dans votre tableau payslipData :');
-      console.log(objectString);
-      console.log('Format JSON :');
-      console.log(jsonString);
-      console.log('=============================');
-      
       // Add the item
       onAdd({
         ...newItem,
