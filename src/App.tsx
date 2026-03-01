@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Github, RefreshCw, AlertCircle, Plus, LogOut, Shield, Image, Map } from 'lucide-react';
+import { Github, AlertCircle, Plus, LogOut, Shield, Image, Map } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
@@ -30,8 +30,8 @@ function App() {
   const { t } = useLanguage();
   const { isAdmin, username, logout } = useAuth();
   const navigate = useNavigate();
-  const { data: initialPayslipItems, loading: dataLoading, error: dataError, refetch: refetchData } = usePayslipData();
-  const { error: categoriesError, refetch: refetchCategories } = useCategories();
+  const { data: initialPayslipItems, loading: dataLoading, error: dataError } = usePayslipData();
+  const { error: categoriesError } = useCategories();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [payslipItems, setPayslipItems] = useState<PayslipItem[]>([]);
@@ -138,10 +138,6 @@ function App() {
     await logout();
   };
 
-  const handleRefresh = async () => {
-    await Promise.all([refetchData(), refetchCategories()]);
-  };
-
   const handleBack = () => {
     window.location.hash = '';
   };
@@ -182,11 +178,6 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!selectedItem && (
-              <Button variant="outline" size="icon" onClick={handleRefresh} title="Rafraîchir">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="sm"
