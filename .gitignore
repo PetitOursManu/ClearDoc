@@ -36,3 +36,7 @@ dist-ssr
 # Données locales (base SQLite + images uploadées)
 # Ne jamais committer ni écraser
 data/
+
+# Fichiers internes
+PROMPT.md
+ClearDoc.zip

@@ -119,6 +119,21 @@ Once logged in:
 
 ---
 
+## Interactive payslip
+
+ClearDoc includes an interactive payslip feature:
+
+- **`/fiche-de-paie`** — A payslip image with clickable zones. Hovering a zone shows the document title; clicking navigates directly to its explanation.
+- **`/admin/payslip-map`** — Admin page to set up the interactive payslip:
+  1. Upload a payslip image
+  2. Draw clickable zones by dragging over the image
+  3. Link each zone to a document from your library
+  4. Delete or edit zones at any time
+
+Zones are stored as percentages of the image dimensions, so they stay correctly positioned at any screen size.
+
+---
+
 ## Data persistence
 
 The `data/` folder (database + uploaded images) is listed in `.gitignore`. It will never be overwritten by a `git pull` or a code update.
@@ -193,3 +208,14 @@ The `data/` folder (database + uploaded images) is listed in `.gitignore`. It wi
 | `POST` | `/api/upload` | Yes | Field name: `image`, max 10 MB |
 
 Uploaded images are stored in `data/uploads/` and served at `/uploads/filename.jpg`.
+
+### Interactive payslip
+
+| Method | Route | Auth required | Notes |
+|---|---|---|---|
+| `GET` | `/api/payslip-settings` | No | Returns the current payslip image path |
+| `POST` | `/api/payslip-settings/image` | Yes | Upload payslip image (field: `image`) |
+| `GET` | `/api/payslip-zones` | No | Returns all zones with linked document title |
+| `POST` | `/api/payslip-zones` | Yes | Create a zone (`document_id`, `x`, `y`, `width`, `height` in %) |
+| `PUT` | `/api/payslip-zones/:id` | Yes | Update a zone |
+| `DELETE` | `/api/payslip-zones/:id` | Yes | Delete a zone |
