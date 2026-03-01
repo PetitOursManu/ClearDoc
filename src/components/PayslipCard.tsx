@@ -53,7 +53,6 @@ export function PayslipCard({ item, onEdit, onDelete, isAdmin = false }: Payslip
               <Badge variant="secondary" className="dark:bg-slate-800 dark:text-gray-300">
                 {item.category}
               </Badge>
-              <span className="text-xs text-muted-foreground">ID: {item.id}</span>
             </div>
           </div>
           {isAdmin && (
