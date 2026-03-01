@@ -1,38 +1,56 @@
-**Ajoute la gestion complète des catégories pour l'admin dans ClearDoc :**
+**Nouvelle fonctionnalité : Fiche de paie interactive**
 
-**Backend**
+**Concept**
 
-
-
-**Route POST pour créer une nouvelle catégorie (admin uniquement, token JWT requis)**
-
-**Route DELETE pour supprimer une catégorie (admin uniquement, token JWT requis)**
-
-**Route PATCH pour renommer une catégorie (admin uniquement, token JWT requis)**
-
-**Avant toute suppression, vérifier dans SQLite si la catégorie est utilisée par au moins une description. Si c'est le cas, retourner une erreur 409 Conflict avec un message explicite indiquant le nombre de descriptions concernées**
+**Un modèle unique de fiche de paie (image) sur lequel l'admin peut dessiner des zones cliquables. Chaque zone est liée à une entrée existante dans ClearDoc. Les utilisateurs peuvent ensuite cliquer sur une zone pour être redirigés vers la description correspondante.**
 
 
 
-**Interface (visible uniquement quand l'admin est connecté)**
+**Interface admin (visible uniquement quand connecté)**
 
 
 
-**Dans la zone des catégories, ajouter un bouton "+" pour créer une nouvelle catégorie**
+**Une nouvelle page dédiée /admin/payslip-map accessible depuis le header admin**
 
-**Chaque catégorie existante doit avoir une icône de modification (crayon) et une icône de suppression (croix)**
+**L'admin peut uploader une image de fiche de paie qui servira de modèle unique**
 
-**À la suppression, afficher une modale de confirmation "Êtes-vous sûr de vouloir supprimer la catégorie X ?"**
+**Sur cette image, l'admin peut dessiner des rectangles avec la souris pour définir des zones cliquables**
 
-**Au clic sur le crayon, permettre de modifier le nom directement en ligne ou via une modale**
+**Pour chaque zone dessinée, une liste déroulante permet de sélectionner l'entrée ClearDoc correspondante**
 
-**Si le backend retourne une erreur 409, afficher un message d'erreur visible et clair dans l'interface du style : "Impossible de supprimer cette catégorie, elle est utilisée par X description(s)"**
+**Les zones existantes sont affichées sur l'image avec leur titre et peuvent être modifiées ou supprimées**
 
-**Tous les messages d'erreur doivent être affichés uniquement dans l'interface utilisateur, aucun message d'erreur ne doit apparaître dans la console du navigateur**
+**Les zones et leurs coordonnées sont sauvegardées en base SQLite**
 
-**Si la suppression ou le renommage réussit, la liste des catégories se met à jour immédiatement sans recharger la page**
+**L'interface doit fonctionner sur desktop et tablette**
 
-**Le style des boutons, modales et messages d'erreur doit respecter le design visuel existant de ClearDoc**
+
+
+**Interface utilisateur**
+
+
+
+**Une nouvelle page /fiche-de-paie accessible depuis le menu principal**
+
+**Elle affiche le modèle de fiche de paie avec les zones cliquables visibles (légèrement surlignées)**
+
+**Au survol d'une zone (hover), celle-ci se met en évidence avec le titre de l'entrée liée affiché en tooltip**
+
+**Au clic sur une zone, l'utilisateur est redirigé vers la page de la description correspondante**
+
+**L'affichage doit être responsive : l'image et les zones s'adaptent à la taille de l'écran (desktop, tablette, smartphone) en recalculant les coordonnées proportionnellement**
+
+
+
+**Base de données**
+
+
+
+**Ajouter une table payslip\_zones avec les colonnes : id, document\_id (lié à la table documents), x, y, width, height, created\_at**
+
+**Ajouter une table ou colonne pour stocker le chemin de l'image modèle**
+
+**Les coordonnées sont stockées en pourcentage (0-100) plutôt qu'en pixels, pour garantir l'adaptation à toutes les tailles d'écran**
 
 
 
@@ -40,5 +58,9 @@
 
 
 
-**Ne pas supposer la structure des dossiers du projet, analyser le code existant pour placer les nouvelles routes et composants aux bons endroits**
+**Ne pas supposer la structure des dossiers, analyser le code existant**
+
+**Respecter le style visuel existant de ClearDoc**
+
+**Aucune erreur ne doit apparaître dans la console du navigateur**
 

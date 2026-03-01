@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import App from './App.tsx';
 import { AdminLogin } from './pages/AdminLogin.tsx';
+import { PayslipMap } from './pages/PayslipMap.tsx';
+import { InteractivePayslip } from './pages/InteractivePayslip.tsx';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -17,6 +19,8 @@ createRoot(document.getElementById('root')!).render(
             <Routes>
               <Route path="/" element={<App />} />
               <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/payslip-map" element={<PayslipMap />} />
+              <Route path="/fiche-de-paie" element={<InteractivePayslip />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </AuthProvider>

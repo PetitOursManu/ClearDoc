@@ -79,6 +79,21 @@ db.exec(`
     count INTEGER NOT NULL DEFAULT 0,
     blocked_until DATETIME
   );
+
+  CREATE TABLE IF NOT EXISTS payslip_zones (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    x REAL NOT NULL,
+    y REAL NOT NULL,
+    width REAL NOT NULL,
+    height REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS payslip_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // Catégories par défaut si la table est vide
@@ -516,6 +531,96 @@ app.delete('/api/descriptions/:id', requireAuth, (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Description non trouvée' });
     db.prepare('DELETE FROM descriptions WHERE id = ?').run(req.params.id);
     res.json({ ok: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ROUTES - PAYSLIP ZONES (lecture publique, écriture protégée)
+// ============================================
+
+const ZONE_SELECT = `
+  SELECT pz.id, pz.document_id, pz.x, pz.y, pz.width, pz.height, pz.created_at,
+         d.title as document_title
+  FROM payslip_zones pz
+  LEFT JOIN documents d ON pz.document_id = d.id
+`;
+
+app.get('/api/payslip-zones', (_req, res) => {
+  try {
+    const zones = db.prepare(`${ZONE_SELECT} ORDER BY pz.created_at ASC`).all();
+    res.json({ _fromServer: true, zones });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/payslip-zones', requireAuth, (req, res) => {
+  try {
+    const { document_id, x, y, width, height } = req.body;
+    if (!document_id) return res.status(400).json({ error: 'document_id requis' });
+    const id = uuidv4();
+    db.prepare('INSERT INTO payslip_zones (id, document_id, x, y, width, height) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, document_id, Number(x), Number(y), Number(width), Number(height));
+    const created = db.prepare(`${ZONE_SELECT} WHERE pz.id = ?`).get(id);
+    res.status(201).json({ _fromServer: true, ...created });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/payslip-zones/:id', requireAuth, (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM payslip_zones WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Zone non trouvée' });
+    const { document_id, x, y, width, height } = req.body;
+    db.prepare('UPDATE payslip_zones SET document_id = ?, x = ?, y = ?, width = ?, height = ? WHERE id = ?')
+      .run(
+        document_id ?? existing.document_id,
+        x !== undefined ? Number(x) : existing.x,
+        y !== undefined ? Number(y) : existing.y,
+        width !== undefined ? Number(width) : existing.width,
+        height !== undefined ? Number(height) : existing.height,
+        req.params.id
+      );
+    const updated = db.prepare(`${ZONE_SELECT} WHERE pz.id = ?`).get(req.params.id);
+    res.json({ _fromServer: true, ...updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/payslip-zones/:id', requireAuth, (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM payslip_zones WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Zone non trouvée' });
+    db.prepare('DELETE FROM payslip_zones WHERE id = ?').run(req.params.id);
+    res.json({ ok: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ROUTES - PAYSLIP SETTINGS
+// ============================================
+
+app.get('/api/payslip-settings', (_req, res) => {
+  try {
+    const setting = db.prepare("SELECT value FROM payslip_settings WHERE key = 'model_image_path'").get();
+    res.json({ _fromServer: true, model_image_path: setting?.value || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/payslip-settings/image', requireAuth, upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    const imageUrl = `/uploads/${req.file.filename}`;
+    db.prepare("INSERT OR REPLACE INTO payslip_settings (key, value) VALUES ('model_image_path', ?)").run(imageUrl);
+    res.json({ _fromServer: true, model_image_path: imageUrl });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

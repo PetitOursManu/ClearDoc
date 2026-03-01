@@ -6,6 +6,8 @@ export const API_CONFIG = {
   get categoriesUrl() { return `${this.baseUrl}/api/categories`; },
   get descriptionsUrl() { return `${this.baseUrl}/api/descriptions`; },
   get uploadUrl() { return `${this.baseUrl}/api/upload`; },
+  get payslipZonesUrl() { return `${this.baseUrl}/api/payslip-zones`; },
+  get payslipSettingsUrl() { return `${this.baseUrl}/api/payslip-settings`; },
 };
 
 // ============================================
@@ -146,6 +148,64 @@ export async function deleteCategory(id: string): Promise<any> {
   return fetchForMutation(`${API_CONFIG.categoriesUrl}/${id}`, {
     method: 'DELETE'
   });
+}
+
+export async function getPayslipZones(): Promise<any> {
+  return fetchFromAPI(API_CONFIG.payslipZonesUrl);
+}
+
+export async function getPayslipSettings(): Promise<any> {
+  return fetchFromAPI(API_CONFIG.payslipSettingsUrl);
+}
+
+export async function createPayslipZone(zone: {
+  document_id: string; x: number; y: number; width: number; height: number;
+}): Promise<any> {
+  return fetchForMutation(API_CONFIG.payslipZonesUrl, {
+    method: 'POST',
+    body: JSON.stringify(zone),
+  });
+}
+
+export async function updatePayslipZone(id: string, zone: {
+  document_id?: string; x?: number; y?: number; width?: number; height?: number;
+}): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.payslipZonesUrl}/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(zone),
+  });
+}
+
+export async function deletePayslipZone(id: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.payslipZonesUrl}/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function uploadPayslipImage(file: File): Promise<{ model_image_path: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
+  try {
+    const response = await fetch(`${API_CONFIG.payslipSettingsUrl}/image`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Erreur upload: ${response.status}`);
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('La requête a expiré. Veuillez réessayer.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function renameCategory(id: string, title: string): Promise<any> {

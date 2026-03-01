@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Github, RefreshCw, AlertCircle, Plus, LogOut, Shield } from 'lucide-react';
+import { Github, RefreshCw, AlertCircle, Plus, LogOut, Shield, Image, Map } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
@@ -187,6 +187,16 @@ function App() {
                 <RefreshCw className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/fiche-de-paie')}
+              title="Fiche de paie interactive"
+              className="text-muted-foreground hover:text-foreground gap-1"
+            >
+              <Image className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs">Fiche interactive</span>
+            </Button>
             <ThemeToggle />
             <LanguageToggle />
             {isAdmin ? (
@@ -195,6 +205,15 @@ function App() {
                   <Shield className="h-3 w-3" />
                   {username}
                 </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate('/admin/payslip-map')}
+                  title="Gérer la fiche de paie interactive"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Map className="h-4 w-4" />
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleLogout} title="Déconnexion">
                   <LogOut className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Déconnexion</span>
