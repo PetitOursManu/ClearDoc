@@ -94,6 +94,25 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS companies (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS pdf_files (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS company_pdfs (
+    company_id TEXT NOT NULL,
+    pdf_id TEXT NOT NULL,
+    PRIMARY KEY (company_id, pdf_id)
+  );
 `);
 
 // Catégories par défaut si la table est vide
@@ -147,6 +166,23 @@ const upload = multer({
       return cb(null, true);
     }
     cb(new Error('Seuls les fichiers images et PDF sont acceptés'));
+  }
+});
+
+const pdfUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${uuidv4()}${ext}`);
+    }
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname)) {
+      return cb(null, true);
+    }
+    cb(new Error('Seuls les fichiers PDF sont acceptés'));
   }
 });
 
@@ -621,6 +657,144 @@ app.post('/api/payslip-settings/image', requireAuth, upload.single('image'), (re
     const imageUrl = `/uploads/${req.file.filename}`;
     db.prepare("INSERT OR REPLACE INTO payslip_settings (key, value) VALUES ('model_image_path', ?)").run(imageUrl);
     res.json({ _fromServer: true, model_image_path: imageUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ROUTES - COMPANIES
+// ============================================
+
+app.get('/api/companies', (_req, res) => {
+  try {
+    const companies = db.prepare('SELECT * FROM companies ORDER BY name').all();
+    res.json({ _fromServer: true, companies });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/companies', requireAuth, (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
+    const id = uuidv4();
+    db.prepare('INSERT INTO companies (id, name) VALUES (?, ?)').run(id, name.trim());
+    const created = db.prepare('SELECT * FROM companies WHERE id = ?').get(id);
+    res.status(201).json({ _fromServer: true, ...created });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/companies/:id', requireAuth, (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Entreprise non trouvée' });
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
+    db.prepare('UPDATE companies SET name = ? WHERE id = ?').run(name.trim(), req.params.id);
+    const updated = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
+    res.json({ _fromServer: true, ...updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/companies/:id', requireAuth, (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Entreprise non trouvée' });
+    db.prepare('DELETE FROM company_pdfs WHERE company_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM companies WHERE id = ?').run(req.params.id);
+    res.json({ ok: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ROUTES - PDF FILES
+// ============================================
+
+app.get('/api/pdf-files', (req, res) => {
+  try {
+    const { company_id } = req.query;
+    if (company_id) {
+      const pdfs = db.prepare(`
+        SELECT pf.* FROM pdf_files pf
+        INNER JOIN company_pdfs cp ON cp.pdf_id = pf.id
+        WHERE cp.company_id = ?
+        ORDER BY pf.name
+      `).all(company_id);
+      return res.json({ _fromServer: true, pdfs });
+    }
+    const pdfs = db.prepare('SELECT * FROM pdf_files ORDER BY name').all();
+    res.json({ _fromServer: true, pdfs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/pdf-files/upload', requireAuth, pdfUpload.single('pdf'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    const { name } = req.body;
+    const docName = name?.trim() || path.basename(req.file.originalname, '.pdf');
+    const id = uuidv4();
+    const filename = `/uploads/${req.file.filename}`;
+    db.prepare('INSERT INTO pdf_files (id, name, filename) VALUES (?, ?, ?)').run(id, docName, filename);
+    const created = db.prepare('SELECT * FROM pdf_files WHERE id = ?').get(id);
+    res.status(201).json({ _fromServer: true, ...created });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/pdf-files/:id', requireAuth, (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM pdf_files WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Fichier non trouvé' });
+    const filePath = path.join(UPLOADS_DIR, path.basename(existing.filename));
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    db.prepare('DELETE FROM company_pdfs WHERE pdf_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM pdf_files WHERE id = ?').run(req.params.id);
+    res.json({ ok: true, id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ROUTES - COMPANY-PDF ASSIGNMENTS
+// ============================================
+
+app.get('/api/company-pdfs', requireAuth, (req, res) => {
+  try {
+    const assignments = db.prepare('SELECT company_id, pdf_id FROM company_pdfs').all();
+    res.json({ _fromServer: true, assignments });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/company-pdfs', requireAuth, (req, res) => {
+  try {
+    const { company_id, pdf_id } = req.body;
+    if (!company_id || !pdf_id) return res.status(400).json({ error: 'company_id et pdf_id requis' });
+    db.prepare('INSERT OR IGNORE INTO company_pdfs (company_id, pdf_id) VALUES (?, ?)').run(company_id, pdf_id);
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/company-pdfs/:company_id/:pdf_id', requireAuth, (req, res) => {
+  try {
+    db.prepare('DELETE FROM company_pdfs WHERE company_id = ? AND pdf_id = ?')
+      .run(req.params.company_id, req.params.pdf_id);
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

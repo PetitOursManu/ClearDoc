@@ -8,6 +8,9 @@ export const API_CONFIG = {
   get uploadUrl() { return `${this.baseUrl}/api/upload`; },
   get payslipZonesUrl() { return `${this.baseUrl}/api/payslip-zones`; },
   get payslipSettingsUrl() { return `${this.baseUrl}/api/payslip-settings`; },
+  get companiesUrl() { return `${this.baseUrl}/api/companies`; },
+  get pdfFilesUrl() { return `${this.baseUrl}/api/pdf-files`; },
+  get companyPdfsUrl() { return `${this.baseUrl}/api/company-pdfs`; },
 };
 
 // ============================================
@@ -329,4 +332,79 @@ export async function getDescriptionsWithFallback(fallbackDescriptions?: any): P
     if (fallbackDescriptions) return fallbackDescriptions;
     throw error;
   }
+}
+
+export async function getCompanies(): Promise<any> {
+  return fetchFromAPI(API_CONFIG.companiesUrl);
+}
+
+export async function getAllCompanyPdfs(): Promise<any> {
+  return fetchForMutation(API_CONFIG.companyPdfsUrl, { method: 'GET' });
+}
+
+export async function createCompany(name: string): Promise<any> {
+  return fetchForMutation(API_CONFIG.companiesUrl, {
+    method: 'POST',
+    body: JSON.stringify({ name })
+  });
+}
+
+export async function renameCompany(id: string, name: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.companiesUrl}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name })
+  });
+}
+
+export async function deleteCompany(id: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.companiesUrl}/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function getPdfFiles(companyId?: string): Promise<any> {
+  const url = companyId
+    ? `${API_CONFIG.pdfFilesUrl}?company_id=${encodeURIComponent(companyId)}`
+    : API_CONFIG.pdfFilesUrl;
+  return fetchFromAPI(url);
+}
+
+export async function uploadPdfFile(file: File, name: string): Promise<any> {
+  const formData = new FormData();
+  formData.append('pdf', file);
+  formData.append('name', name);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  try {
+    const response = await fetch(`${API_CONFIG.pdfFilesUrl}/upload`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Erreur upload: ${response.status}`);
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw new Error('La requête a expiré.');
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function deletePdfFile(id: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.pdfFilesUrl}/${id}`, { method: 'DELETE' });
+}
+
+export async function assignPdfToCompany(companyId: string, pdfId: string): Promise<any> {
+  return fetchForMutation(API_CONFIG.companyPdfsUrl, {
+    method: 'POST',
+    body: JSON.stringify({ company_id: companyId, pdf_id: pdfId })
+  });
+}
+
+export async function unassignPdfFromCompany(companyId: string, pdfId: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.companyPdfsUrl}/${companyId}/${pdfId}`, { method: 'DELETE' });
 }

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Github, AlertCircle, Plus, LogOut, Shield, Image, Map } from 'lucide-react';
+import { Github, AlertCircle, Plus, LogOut, Shield, Image, Map, Building2, Files } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
@@ -178,16 +178,6 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/fiche-de-paie')}
-              title="Fiche de paie interactive"
-              className="text-muted-foreground hover:text-foreground gap-1"
-            >
-              <Image className="h-4 w-4" />
-              <span className="hidden sm:inline text-xs">Fiche interactive</span>
-            </Button>
             <ThemeToggle />
             <LanguageToggle />
             {isAdmin ? (
@@ -204,6 +194,15 @@ function App() {
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <Map className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate('/admin/pdf-manager')}
+                  title="Gérer les documents PDF"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Files className="h-4 w-4" />
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleLogout} title="Déconnexion">
                   <LogOut className="h-4 w-4 mr-1" />
@@ -230,6 +229,25 @@ function App() {
               <Github className="h-6 w-6" />
             </a>
           </div>
+        </div>
+      </div>
+
+      <div className="border-t dark:border-slate-800">
+        <div className="px-4 py-1.5 max-w-7xl mx-auto flex items-center gap-1">
+          <button
+            onClick={() => navigate('/fiche-de-paie')}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Image className="h-4 w-4" />
+            {t('nav.payslip')}
+          </button>
+          <button
+            onClick={() => navigate('/documents')}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Building2 className="h-4 w-4" />
+            {t('nav.documents')}
+          </button>
         </div>
       </div>
 

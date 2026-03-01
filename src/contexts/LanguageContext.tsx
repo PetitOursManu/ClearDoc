@@ -50,6 +50,8 @@ const translations = {
     'add.copied': 'Copié !',
     'add.codeInstruction': 'Copiez ce code dans votre tableau payslipData pour l\'ajouter de manière permanente.',
     'add.close': 'Fermer',
+    'nav.payslip': 'Fiche de paie interactive',
+    'nav.documents': 'Documents des structures',
     'footer.copyright': '© 2025 ClearDoc. Tous droits réservés.',
   },
   en: {
@@ -93,6 +95,8 @@ const translations = {
     'add.copied': 'Copied!',
     'add.codeInstruction': 'Copy this code into your payslipData array to add it permanently.',
     'add.close': 'Close',
+    'nav.payslip': 'Interactive payslip',
+    'nav.documents': 'Structure documents',
     'footer.copyright': '© 2025 ClearDoc. All rights reserved.',
   },
 };

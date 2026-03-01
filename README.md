@@ -134,6 +134,20 @@ Zones are stored as percentages of the image dimensions, so they stay correctly 
 
 ---
 
+## Structure documents
+
+ClearDoc supports sharing PDF documents organized by structure (e.g. companies within a group):
+
+- **`/documents`** — Public page where users select their structure from a dropdown and access the PDFs assigned to it.
+- **`/admin/pdf-manager`** — Admin page to manage everything:
+  - Create, rename and delete structures
+  - Upload PDF files (up to 20 MB each)
+  - Expand any PDF to assign or unassign it from one or more structures using checkboxes
+  - Use **Check all** / **Uncheck all** to assign a PDF to all structures at once
+  - The same PDF can be assigned to multiple structures
+
+---
+
 ## Data persistence
 
 The `data/` folder (database + uploaded images) is listed in `.gitignore`. It will never be overwritten by a `git pull` or a code update.
@@ -219,3 +233,18 @@ Uploaded images are stored in `data/uploads/` and served at `/uploads/filename.j
 | `POST` | `/api/payslip-zones` | Yes | Create a zone (`document_id`, `x`, `y`, `width`, `height` in %) |
 | `PUT` | `/api/payslip-zones/:id` | Yes | Update a zone |
 | `DELETE` | `/api/payslip-zones/:id` | Yes | Delete a zone |
+
+### Structure documents
+
+| Method | Route | Auth required | Notes |
+|---|---|---|---|
+| `GET` | `/api/companies` | No | List all structures |
+| `POST` | `/api/companies` | Yes | Create a structure |
+| `PATCH` | `/api/companies/:id` | Yes | Rename a structure |
+| `DELETE` | `/api/companies/:id` | Yes | Delete a structure and its assignments |
+| `GET` | `/api/pdf-files` | No | List all PDFs (or filter by `?company_id=`) |
+| `POST` | `/api/pdf-files/upload` | Yes | Upload a PDF (field: `pdf`, max 20 MB) |
+| `DELETE` | `/api/pdf-files/:id` | Yes | Delete a PDF and its assignments |
+| `GET` | `/api/company-pdfs` | Yes | List all structure–PDF assignments |
+| `POST` | `/api/company-pdfs` | Yes | Assign a PDF to a structure |
+| `DELETE` | `/api/company-pdfs/:company_id/:pdf_id` | Yes | Remove an assignment |
