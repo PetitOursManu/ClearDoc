@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Edit, Trash2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { PayslipItem } from '@/types/payslip';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCategories } from '@/hooks/useCategories';
 
 const DESCRIPTION_CHAR_LIMIT = 150;
 
@@ -17,7 +18,10 @@ interface PayslipCardProps {
 
 export function PayslipCard({ item, onEdit, onDelete, isAdmin = false }: PayslipCardProps) {
   const { t } = useLanguage();
+  const { categories } = useCategories();
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const categoryTitle = categories.find(c => c.id === item.category)?.title ?? item.category;
   const shouldTruncate = item.description.length > DESCRIPTION_CHAR_LIMIT;
   const displayDescription = shouldTruncate && !isExpanded
     ? item.description.slice(0, DESCRIPTION_CHAR_LIMIT) + '...'
@@ -51,7 +55,7 @@ export function PayslipCard({ item, onEdit, onDelete, isAdmin = false }: Payslip
             </CardTitle>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="dark:bg-slate-800 dark:text-gray-300">
-                {item.category}
+                {categoryTitle}
               </Badge>
             </div>
           </div>
