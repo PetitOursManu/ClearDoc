@@ -134,7 +134,7 @@ export function PayslipMap() {
   };
 
   const handlePointerUp = () => {
-    if (currentRect && currentRect.w > 2 && currentRect.h > 2) {
+    if (currentRect && currentRect.w > 0.5 && currentRect.h > 0.3) {
       setPendingRect(currentRect);
       setSelectedDocId(documents[0]?.id || '');
       setEditingZone(null);
