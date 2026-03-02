@@ -310,7 +310,6 @@ function parseDocument(row) {
     title: row.title,
     description: row.description,
     imageUrl: row.image_path || '',
-    image_path: row.image_path,
     category: row.category,
     keywords: JSON.parse(row.keywords || '[]'),
     created_at: row.created_at,
