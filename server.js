@@ -146,7 +146,13 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 // Servir le frontend buildé en production
 const DIST_DIR = path.join(__dirname, 'dist');
 if (fs.existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR));
+  app.use(express.static(DIST_DIR, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      }
+    },
+  }));
 }
 
 // Configuration multer
