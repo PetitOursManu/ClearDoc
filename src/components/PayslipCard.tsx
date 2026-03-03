@@ -9,6 +9,11 @@ import { useCategories } from '@/hooks/useCategories';
 
 const DESCRIPTION_CHAR_LIMIT = 150;
 
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
+}
+
 interface PayslipCardProps {
   item: PayslipItem;
   onEdit: (item: PayslipItem) => void;
@@ -22,10 +27,11 @@ export function PayslipCard({ item, onEdit, onDelete, isAdmin = false }: Payslip
   const [isExpanded, setIsExpanded] = useState(false);
 
   const categoryTitle = categories.find(c => c.id === item.category)?.title ?? item.category;
-  const shouldTruncate = item.description.length > DESCRIPTION_CHAR_LIMIT;
+  const plainDescription = stripHtml(item.description);
+  const shouldTruncate = plainDescription.length > DESCRIPTION_CHAR_LIMIT;
   const displayDescription = shouldTruncate && !isExpanded
-    ? item.description.slice(0, DESCRIPTION_CHAR_LIMIT) + '...'
-    : item.description;
+    ? plainDescription.slice(0, DESCRIPTION_CHAR_LIMIT) + '...'
+    : plainDescription;
 
   const handleCardClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
