@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/RichTextEditor';
 import {
   Select,
   SelectContent,
@@ -219,15 +219,11 @@ export function AddPayslipDialog({ onAdd }: AddPayslipDialogProps) {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="new-description">{t('edit.field.description')}</Label>
-            <Textarea
-              id="new-description"
-              value={newItem.description}
-              onChange={(e) =>
-                setNewItem({ ...newItem, description: e.target.value })
-              }
-              rows={6}
-              className="resize-none"
+            <Label>{t('edit.field.description')}</Label>
+            <RichTextEditor
+              content={newItem.description}
+              onChange={(html) => setNewItem({ ...newItem, description: html })}
+              placeholder={t('edit.field.description')}
             />
           </div>
 
