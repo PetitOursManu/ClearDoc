@@ -58,10 +58,9 @@ export function PayslipDetail({ item, onBack }: PayslipDetailProps) {
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold mb-3">Description</h3>
-              <div
-                className="rich-content text-sm text-muted-foreground leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: item.description }}
-              />
+              <CardDescription className="text-base leading-relaxed whitespace-pre-wrap">
+                {item.description}
+              </CardDescription>
             </div>
 
             {item.keywords.length > 0 && (

@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RichTextEditor } from '@/components/RichTextEditor';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -141,11 +141,15 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
           </div>
           
           <div className="space-y-2">
-            <Label>{t('edit.field.description')}</Label>
-            <RichTextEditor
-              content={editedItem.description}
-              onChange={(html) => setEditedItem({ ...editedItem, description: html })}
-              placeholder={t('edit.field.description')}
+            <Label htmlFor="description">{t('edit.field.description')}</Label>
+            <Textarea
+              id="description"
+              value={editedItem.description}
+              onChange={(e) =>
+                setEditedItem({ ...editedItem, description: e.target.value })
+              }
+              rows={6}
+              className="resize-none"
             />
           </div>
         </div>
