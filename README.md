@@ -84,10 +84,10 @@ This interactive script asks for a username and a password (minimum 8 characters
 
 Development requires **two terminals running in parallel**:
 
-| Terminal | Command | Port |
-|---|---|---|
-| 1 | `npm run server` | `http://localhost:3001` (API Express) |
-| 2 | `npm run dev` | `http://localhost:5173` (Vite dev server) |
+| Terminal | Command | Role | Port |
+|---|---|---|---|
+| 1 | `npm run server` | Backend (API Express) | `http://localhost:3001` |
+| 2 | `npm run dev` | Frontend (Vite dev server) | `http://localhost:5173` |
 
 Open the app at `http://localhost:5173`.
 
