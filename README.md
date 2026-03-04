@@ -80,17 +80,18 @@ npm run setup-admin
 
 This interactive script asks for a username and a password (minimum 8 characters). It requires the `data/` folder to exist, which is why the server must be started at least once beforehand. Run it only once. To replace the existing admin account, run it again and confirm.
 
-### Step 3 — Start the frontend (development only)
+### Step 3 — Start in development mode
 
-Open a second terminal and run:
+Development requires **two terminals running in parallel**:
 
-```bash
-npm run dev
-```
+| Terminal | Command | Port |
+|---|---|---|
+| 1 | `npm run server` | `http://localhost:3001` (API Express) |
+| 2 | `npm run dev` | `http://localhost:5173` (Vite dev server) |
 
-The app is now available at `http://localhost:5173`.
+Open the app at `http://localhost:5173`.
 
-> In development, the frontend and backend run on separate ports. API requests from the browser are automatically forwarded to the backend by Vite's built-in proxy.
+> The frontend and backend run on separate ports. API requests from the browser are automatically forwarded to the Express backend by Vite's built-in proxy — no manual configuration needed.
 
 ---
 
