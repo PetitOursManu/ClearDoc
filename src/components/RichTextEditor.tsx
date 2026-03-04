@@ -67,12 +67,11 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
     },
   });
 
-  // Sync content when parent changes (e.g. opening EditDialog with different item)
-  const prevContentRef = useRef(content);
+  // Only sync when content changes externally (e.g. opening EditDialog with different item).
+  // Skip if the editor itself produced this HTML (avoids cursor reset on every keystroke).
   useEffect(() => {
     if (!editor) return;
-    if (content !== prevContentRef.current) {
-      prevContentRef.current = content;
+    if (content !== editor.getHTML()) {
       editor.commands.setContent(content || '');
     }
   }, [content, editor]);
