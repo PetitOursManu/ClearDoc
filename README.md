@@ -60,15 +60,7 @@ VITE_API_TIMEOUT=10000  # Request timeout in milliseconds
 
 ## First-time setup
 
-### Step 1 — Create the admin account
-
-```bash
-npm run setup-admin
-```
-
-This interactive script asks for a username and a password (minimum 8 characters). Run it only once. To replace the existing admin account, run it again and confirm.
-
-### Step 2 — Start the server
+### Step 1 — Start the server once
 
 ```bash
 npm run server
@@ -77,6 +69,16 @@ npm run server
 The server starts on `http://localhost:3001`. On first run, it automatically creates:
 - `data/cleardoc.db` — the SQLite database
 - `data/uploads/` — the folder where uploaded images are stored
+
+You can stop the server after it has started (Ctrl+C) or keep it running.
+
+### Step 2 — Create the admin account
+
+```bash
+npm run setup-admin
+```
+
+This interactive script asks for a username and a password (minimum 8 characters). It requires the `data/` folder to exist, which is why the server must be started at least once beforehand. Run it only once. To replace the existing admin account, run it again and confirm.
 
 ### Step 3 — Start the frontend (development only)
 
