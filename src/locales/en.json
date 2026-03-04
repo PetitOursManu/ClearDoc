@@ -38,7 +38,7 @@
   },
   "form": {
     "title": "Title",
-    "description": "Description",
+    "description": "Description (rich text editor)",
     "imageUrl": "Image URL",
     "category": "Category",
     "keywords": "Keywords (comma separated)"

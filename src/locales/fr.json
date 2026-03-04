@@ -38,7 +38,7 @@
   },
   "form": {
     "title": "Titre",
-    "description": "Description",
+    "description": "Description (éditeur de texte riche)",
     "imageUrl": "URL de l'image",
     "category": "Catégorie",
     "keywords": "Mots-clés (séparés par des virgules)"

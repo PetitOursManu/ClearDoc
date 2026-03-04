@@ -6,7 +6,7 @@ ClearDoc is a web application to store and browse explanations of payslip lines.
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, TipTap |
 | Backend | Node.js, Express |
 | Database | SQLite (`data/cleardoc.db`) |
 | Auth | JWT (httpOnly cookie) + bcrypt |
@@ -116,6 +116,20 @@ Once logged in:
 - An **Add entry** button appears in the list
 - Category badges show **rename** (pencil) and **delete** (×) icons
 - A **New** button lets you create additional categories
+
+---
+
+## Rich text editor
+
+The description field in the add and edit dialogs uses a rich text editor powered by [TipTap](https://tiptap.dev). Available formatting options:
+
+- **Bold**, *italic*, underline
+- Text color (color picker)
+- Headings (H1, H2, H3) and paragraph
+- Text alignment (left, center, right, justify)
+- Bullet lists and ordered lists
+
+Descriptions are stored as HTML in the database. They are rendered with full formatting on the entry detail page, and displayed as plain text (tags stripped) in the card preview.
 
 ---
 
