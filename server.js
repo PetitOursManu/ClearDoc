@@ -888,7 +888,8 @@ app.post('/api/admin/remotion/install', requireAuth, (_req, res) => {
     try {
       await runCmd('npm install remotion @remotion/cli');
       send('Installation Remotion terminée.');
-      await runCmd('npx remotion install chromium');
+      // Remotion 4.x : "remotion install chromium" n'existe plus, c'est "browser ensure".
+      await runCmd('npx remotion browser ensure');
       send('Installation Chromium terminée.');
 
       for (const dir of [VIDEOS_DIR, AUDIO_DIR, VIDEOS_CODE_DIR]) {
@@ -971,6 +972,12 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
     return res.end();
   }
 
+  // Heartbeat : garde la connexion SSE vivante pendant le render (sinon un reverse
+  // proxy ou le navigateur peut couper la connexion -> "Network Error").
+  const heartbeat = setInterval(() => {
+    try { res.write(': ping\n\n'); } catch { /* connexion fermée */ }
+  }, 15000);
+
   renderInProgress = true;
   try {
     const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
@@ -989,6 +996,7 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
   } catch (e) {
     sseWrite(res, { error: e.message });
   } finally {
+    clearInterval(heartbeat);
     renderInProgress = false;
     res.end();
   }

@@ -7,7 +7,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 
 const FPS = 30;
 const WIDTH = 1920;
@@ -293,36 +293,56 @@ registerRoot(RemotionRoot);
 // ÉTAPE 5 — RENDER REMOTION
 // ============================================
 
-export function renderVideo({ componentName, slug, projectRoot }) {
-  const output = path.join('data', 'videos', `${slug}.mp4`);
-  const args = [
-    'remotion', 'render', 'src/Root.tsx', componentName, output,
-    '--codec=h264',
-    '--crf=1',
-    '--pixel-format=yuv420p',
-    '--image-format=png',
-    '--scale=1.5',
-    '--public-dir=data',
-    '--log=error',
-  ];
+// Render asynchrone (NE JAMAIS bloquer la boucle d'événements Node : le serveur
+// sert aussi le frontend). Timeout pour éviter tout gel permanent si Chromium
+// ne se lance pas.
+export function renderVideo({ componentName, slug, projectRoot, onLog, timeoutMs = 12 * 60 * 1000 }) {
+  return new Promise((resolve, reject) => {
+    const output = path.join('data', 'videos', `${slug}.mp4`);
+    const args = [
+      'remotion', 'render', 'src/Root.tsx', componentName, output,
+      '--codec=h264',
+      '--crf=1',
+      '--pixel-format=yuv420p',
+      '--image-format=png',
+      '--scale=1.5',
+      '--public-dir=data',
+      '--log=error',
+    ];
 
-  const result = spawnSync('npx', args, {
-    cwd: projectRoot,
-    encoding: 'utf-8',
-    maxBuffer: 64 * 1024 * 1024,
+    const proc = spawn('npx', args, { cwd: projectRoot });
+    let stderr = '';
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      proc.kill('SIGKILL');
+      reject(new Error(`Render Remotion interrompu (timeout ${Math.round(timeoutMs / 60000)} min)`));
+    }, timeoutMs);
+
+    proc.stdout.on('data', d => onLog?.(d.toString()));
+    proc.stderr.on('data', d => { stderr += d.toString(); onLog?.(d.toString()); });
+
+    proc.on('error', err => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(`Impossible de lancer Remotion: ${err.message}`));
+    });
+
+    proc.on('close', code => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code !== 0) {
+        return reject(new Error(`Échec du render Remotion (code ${code}): ${stderr.slice(-800)}`));
+      }
+      const abs = path.join(projectRoot, output);
+      if (!fs.existsSync(abs)) return reject(new Error('Le fichier vidéo n\'a pas été produit'));
+      resolve(abs);
+    });
   });
-
-  if (result.error) {
-    throw new Error(`Impossible de lancer Remotion: ${result.error.message}`);
-  }
-  if (result.status !== 0) {
-    const out = (result.stderr || result.stdout || '').slice(-800);
-    throw new Error(`Échec du render Remotion (code ${result.status}): ${out}`);
-  }
-
-  const abs = path.join(projectRoot, output);
-  if (!fs.existsSync(abs)) throw new Error('Le fichier vidéo n\'a pas été produit');
-  return abs;
 }
 
 // ============================================
@@ -382,9 +402,9 @@ export async function generateVideoForDocument({ doc, getSetting, send, projectR
   updateRoot({ videosDir: videosCodeDir, rootPath });
   send('tsx', 'Composant vidéo créé', 70);
 
-  // Étape 4 — Render
+  // Étape 4 — Render (asynchrone, ne bloque pas la boucle d'événements)
   send('render', 'Render vidéo en cours (~2-3 min)...', 75);
-  renderVideo({ componentName, slug, projectRoot });
+  await renderVideo({ componentName, slug, projectRoot });
   send('render', 'Vidéo rendue', 90);
 
   const videoUrl = `/data/videos/${slug}.mp4`;
