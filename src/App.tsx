@@ -368,6 +368,9 @@ function App() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           onSave={handleSave}
+          onVideoDeleted={(id) =>
+            setPayslipItems(items => items.map(i => (i.id === id ? { ...i, videoUrl: '' } : i)))
+          }
         />
       </div>
     </div>

@@ -33,12 +33,16 @@ const DATA_DIR = path.join(__dirname, 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const VIDEOS_DIR = path.join(DATA_DIR, 'videos');
 const AUDIO_DIR = path.join(DATA_DIR, 'audio');
+const BRANDING_DIR = path.join(DATA_DIR, 'branding');
 const DB_PATH = path.join(DATA_DIR, 'cleardoc.db');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
 if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
+if (!fs.existsSync(BRANDING_DIR)) fs.mkdirSync(BRANDING_DIR, { recursive: true });
+
+const WATERMARK_PATH = path.join(BRANDING_DIR, 'watermark.png');
 
 const db = new Database(DB_PATH);
 
@@ -134,6 +138,12 @@ try {
   // Colonne déjà existante, ignorer
 }
 
+// Valeurs par défaut de l'apparence des vidéos
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_THEME', 'cleardoc')").run();
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_ACCENT_COLOR', '#dc2626')").run();
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_WATERMARK_POSITION', 'bottom-right')").run();
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_WATERMARK_SIZE', 'medium')").run();
+
 // Catégories par défaut si la table est vide
 const categoriesCount = db.prepare('SELECT COUNT(*) as count FROM categories').get();
 if (categoriesCount.count === 0) {
@@ -175,6 +185,9 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 // Servir les vidéos générées (volume persistant Coolify)
 app.use('/data/videos', express.static(VIDEOS_DIR));
 
+// Servir les éléments de marque (watermark) — volume persistant
+app.use('/data/branding', express.static(BRANDING_DIR));
+
 // Servir le frontend buildé en production
 const DIST_DIR = path.join(__dirname, 'dist');
 if (fs.existsSync(DIST_DIR)) {
@@ -215,6 +228,21 @@ const pdfUpload = multer({
       return cb(null, true);
     }
     cb(new Error('Seuls les fichiers PDF sont acceptés'));
+  }
+});
+
+// Watermark : toujours le même fichier (data/branding/watermark.png), PNG uniquement
+const watermarkUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, BRANDING_DIR),
+    filename: (_req, _file, cb) => cb(null, 'watermark.png')
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'image/png' || /\.png$/i.test(file.originalname)) {
+      return cb(null, true);
+    }
+    cb(new Error('Le watermark doit être un fichier PNG'));
   }
 });
 
@@ -888,7 +916,8 @@ app.post('/api/admin/remotion/install', requireAuth, (_req, res) => {
     try {
       await runCmd('npm install remotion @remotion/cli');
       send('Installation Remotion terminée.');
-      await runCmd('npx remotion install chromium');
+      // Remotion 4.x : "remotion install chromium" n'existe plus, c'est "browser ensure".
+      await runCmd('npx remotion browser ensure');
       send('Installation Chromium terminée.');
 
       for (const dir of [VIDEOS_DIR, AUDIO_DIR, VIDEOS_CODE_DIR]) {
@@ -917,7 +946,10 @@ app.post('/api/admin/remotion/uninstall', requireAuth, (_req, res) => {
 });
 
 // --- Lecture des paramètres (clés masquées) ---
-const SETTINGS_KEYS = ['AI_API_KEY', 'AI_API_BASE_URL', 'AI_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID'];
+const SETTINGS_KEYS = [
+  'AI_API_KEY', 'AI_API_BASE_URL', 'AI_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID',
+  'VIDEO_THEME', 'VIDEO_ACCENT_COLOR', 'VIDEO_WATERMARK_POSITION', 'VIDEO_WATERMARK_SIZE',
+];
 
 app.get('/api/admin/settings', requireAuth, (_req, res) => {
   const result = {};
@@ -949,6 +981,36 @@ app.post('/api/admin/settings', requireAuth, (req, res) => {
   }
 });
 
+// --- Watermark : statut ---
+app.get('/api/admin/video-watermark', requireAuth, (_req, res) => {
+  const exists = fs.existsSync(WATERMARK_PATH);
+  res.json({
+    exists,
+    url: exists ? `/data/branding/watermark.png?t=${fs.statSync(WATERMARK_PATH).mtimeMs}` : null,
+    position: getSetting('VIDEO_WATERMARK_POSITION') || 'bottom-right',
+    size: getSetting('VIDEO_WATERMARK_SIZE') || 'medium',
+  });
+});
+
+// --- Watermark : upload (PNG) ---
+app.post('/api/admin/video-watermark', requireAuth, (req, res) => {
+  watermarkUpload.single('watermark')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    res.json({ ok: true, url: `/data/branding/watermark.png?t=${Date.now()}` });
+  });
+});
+
+// --- Watermark : suppression ---
+app.delete('/api/admin/video-watermark', requireAuth, (_req, res) => {
+  try {
+    if (fs.existsSync(WATERMARK_PATH)) fs.unlinkSync(WATERMARK_PATH);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Liste des documents possédant une vidéo ---
 app.get('/api/admin/videos', requireAuth, (_req, res) => {
   try {
@@ -971,16 +1033,25 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
     return res.end();
   }
 
+  // Heartbeat : garde la connexion SSE vivante pendant le render (sinon un reverse
+  // proxy ou le navigateur peut couper la connexion -> "Network Error").
+  const heartbeat = setInterval(() => {
+    try { res.write(': ping\n\n'); } catch { /* connexion fermée */ }
+  }, 15000);
+
   renderInProgress = true;
   try {
     const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
     if (!doc) throw new Error('Document introuvable');
 
+    const { theme, accentColor } = req.body || {};
     const { videoUrl } = await generateVideoForDocument({
       doc,
       getSetting,
       send,
       projectRoot: __dirname,
+      theme,
+      accentColor,
     });
 
     // La vidéo n'est PAS publiée automatiquement : l'admin la valide depuis l'aperçu.
@@ -989,6 +1060,7 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
   } catch (e) {
     sseWrite(res, { error: e.message });
   } finally {
+    clearInterval(heartbeat);
     renderInProgress = false;
     res.end();
   }
