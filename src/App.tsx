@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Github, AlertCircle, Plus, LogOut, Shield, Image, Map, Building2, Files } from 'lucide-react';
+import { Github, AlertCircle, Plus, LogOut, Shield, Image, Map, Building2, Files, Video } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { SearchBar } from '@/components/SearchBar';
 import { CategoryFilter } from '@/components/CategoryFilter';
@@ -203,6 +203,15 @@ function App() {
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <Files className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate('/admin/video-generator')}
+                  title="Génération vidéo"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Video className="h-4 w-4" />
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleLogout} title="Déconnexion">
                   <LogOut className="h-4 w-4 mr-1" />

@@ -3,6 +3,7 @@ export interface PayslipItem {
   title: string;
   description: string;
   imageUrl: string;
+  videoUrl?: string;
   category: string;
   keywords: string[];
 }
