@@ -134,6 +134,10 @@ try {
   // Colonne déjà existante, ignorer
 }
 
+// Valeurs par défaut de l'apparence des vidéos
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_THEME', 'cleardoc')").run();
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_ACCENT_COLOR', '#dc2626')").run();
+
 // Catégories par défaut si la table est vide
 const categoriesCount = db.prepare('SELECT COUNT(*) as count FROM categories').get();
 if (categoriesCount.count === 0) {
@@ -918,7 +922,10 @@ app.post('/api/admin/remotion/uninstall', requireAuth, (_req, res) => {
 });
 
 // --- Lecture des paramètres (clés masquées) ---
-const SETTINGS_KEYS = ['AI_API_KEY', 'AI_API_BASE_URL', 'AI_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID'];
+const SETTINGS_KEYS = [
+  'AI_API_KEY', 'AI_API_BASE_URL', 'AI_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID',
+  'VIDEO_THEME', 'VIDEO_ACCENT_COLOR',
+];
 
 app.get('/api/admin/settings', requireAuth, (_req, res) => {
   const result = {};
@@ -983,11 +990,14 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
     const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
     if (!doc) throw new Error('Document introuvable');
 
+    const { theme, accentColor } = req.body || {};
     const { videoUrl } = await generateVideoForDocument({
       doc,
       getSetting,
       send,
       projectRoot: __dirname,
+      theme,
+      accentColor,
     });
 
     // La vidéo n'est PAS publiée automatiquement : l'admin la valide depuis l'aperçu.

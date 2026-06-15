@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Video, Settings, Sparkles, Download, Trash2, Loader2,
-  AlertCircle, CheckCircle2, XCircle, Save, PackagePlus, PackageMinus, X,
+  AlertCircle, CheckCircle2, XCircle, Save, PackagePlus, PackageMinus, X, Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import {
   type RemotionStatus, type GeneratedVideo,
 } from '@/config/apiConfig';
 import { PayslipItem } from '@/types/payslip';
+import { VIDEO_THEMES, DEFAULT_THEME, ACCENT_PRESETS, type VideoTheme } from '@/lib/videoThemes';
 
 const SETTINGS_FIELDS: { key: string; label: string; placeholder: string; isKey: boolean }[] = [
   { key: 'AI_API_KEY', label: 'Clé API IA', placeholder: 'sk-...', isKey: true },
@@ -29,6 +30,66 @@ const SETTINGS_FIELDS: { key: string; label: string; placeholder: string; isKey:
   { key: 'ELEVENLABS_API_KEY', label: 'Clé API ElevenLabs', placeholder: 'xi-...', isKey: true },
   { key: 'ELEVENLABS_VOICE_ID', label: 'ID Voix ElevenLabs', placeholder: 'O31r762Gb3WFygrEOGh0', isKey: false },
 ];
+
+function ThemeCard({ theme, accent, selected, onClick }: {
+  theme: VideoTheme; accent: string; selected: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg overflow-hidden border-2 transition-all text-left ${
+        selected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
+      }`}
+    >
+      <div className="h-16 p-2 flex flex-col justify-end" style={{ background: theme.bgGradient || theme.bg }}>
+        <div
+          className="text-[8px] font-bold px-1.5 py-0.5 rounded-full w-fit mb-1"
+          style={{ background: theme.badgeBg(accent), color: theme.badgeText(accent) }}
+        >
+          Section
+        </div>
+        <div className="text-[9px] font-bold" style={{ color: theme.textPrimary }}>Titre exemple</div>
+        <div className="h-0.5 w-1/3 rounded mt-1" style={{ background: accent }} />
+      </div>
+      <div className="px-2 py-1.5 bg-card">
+        <p className="text-[11px] font-medium">{theme.emoji} {theme.name}</p>
+      </div>
+    </button>
+  );
+}
+
+function ThemePreview({ theme, accent }: { theme: VideoTheme; accent: string }) {
+  return (
+    <div className="rounded-lg overflow-hidden border border-border">
+      <div className="text-xs text-muted-foreground px-3 py-1.5 border-b border-border bg-muted">
+        Aperçu — thème {theme.name}
+      </div>
+      <div className="p-6 flex flex-col items-start" style={{ background: theme.bgGradient || theme.bg, minHeight: 140 }}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-1 h-6 rounded" style={{ background: accent }} />
+          <span
+            className="text-xs font-bold px-3 py-1 rounded-full border"
+            style={{ background: theme.badgeBg(accent), color: theme.badgeText(accent), borderColor: `${accent}40` }}
+          >
+            TITRE DE LA SECTION
+          </span>
+        </div>
+        <div className="w-full rounded-xl p-4 border" style={{ background: theme.surface, borderColor: theme.surfaceBorder }}>
+          <p className="text-sm font-bold mb-1" style={{ color: theme.textPrimary }}>
+            Explication du terme de fiche de paie
+          </p>
+          <p className="text-xs" style={{ color: theme.textSecondary }}>
+            Le texte explicatif apparaît ici, généré automatiquement par l'IA à partir de la description.
+          </p>
+        </div>
+        <div className="w-full h-0.5 bg-black/10 rounded mt-4">
+          <div className="h-full w-1/3 rounded" style={{ background: accent }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function VideoGenerator() {
   const navigate = useNavigate();
@@ -48,6 +109,12 @@ export function VideoGenerator() {
   const [installing, setInstalling] = useState(false);
   const [installLogs, setInstallLogs] = useState<string[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
+
+  // --- Section apparence ---
+  const [selectedTheme, setSelectedTheme] = useState<string>(DEFAULT_THEME.id);
+  const [accentColor, setAccentColor] = useState<string>(DEFAULT_THEME.defaultAccent);
+  const [savingAppearance, setSavingAppearance] = useState(false);
+  const [appearanceSaved, setAppearanceSaved] = useState(false);
 
   // --- Section génération ---
   const [documents, setDocuments] = useState<PayslipItem[]>([]);
@@ -78,6 +145,11 @@ export function VideoGenerator() {
         }
         setSettings(vals);
         setFromEnv(env);
+        // Apparence persistée
+        const themeVal = settingsData['VIDEO_THEME'];
+        const accentVal = settingsData['VIDEO_ACCENT_COLOR'];
+        if (typeof themeVal === 'string' && VIDEO_THEMES[themeVal]) setSelectedTheme(themeVal);
+        if (typeof accentVal === 'string' && accentVal) setAccentColor(accentVal);
         setRemotion(remotionData);
         setDocuments((docsData.items ?? []) as PayslipItem[]);
         setVideos((videosData.videos ?? []) as GeneratedVideo[]);
@@ -152,6 +224,19 @@ export function VideoGenerator() {
     }
   };
 
+  const handleSaveAppearance = async () => {
+    setSavingAppearance(true);
+    setError(null);
+    try {
+      await saveAdminSettings({ VIDEO_THEME: selectedTheme, VIDEO_ACCENT_COLOR: accentColor });
+      setAppearanceSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+    } finally {
+      setSavingAppearance(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!selectedDoc) return;
     setGenerating(true);
@@ -169,7 +254,7 @@ export function VideoGenerator() {
           setResultVideoUrl(data.videoUrl);
           setProgress(100);
         }
-      });
+      }, { body: JSON.stringify({ theme: selectedTheme, accentColor }) });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
     } finally {
@@ -358,6 +443,86 @@ export function VideoGenerator() {
                 {installing && <div className="animate-pulse">…</div>}
               </div>
             )}
+          </section>
+
+          {/* Section — Apparence des vidéos */}
+          <section className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-5">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 flex items-center gap-2">
+              <Palette className="h-5 w-5 text-muted-foreground" />
+              Apparence des vidéos
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Choisissez un thème et une couleur d'accentuation pour toutes vos vidéos générées.
+            </p>
+
+            {/* Grille des thèmes */}
+            <div className="mb-6">
+              <Label className="text-sm mb-3 block">Thème</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                {Object.values(VIDEO_THEMES).map((theme) => (
+                  <ThemeCard
+                    key={theme.id}
+                    theme={theme}
+                    accent={accentColor}
+                    selected={selectedTheme === theme.id}
+                    onClick={() => { setSelectedTheme(theme.id); setAppearanceSaved(false); }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Couleur d'accentuation */}
+            <div className="mb-6">
+              <Label className="text-sm mb-3 block">Couleur d'accentuation</Label>
+              <div className="flex gap-2 flex-wrap mb-3">
+                {ACCENT_PRESETS.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    title={color.name}
+                    onClick={() => { setAccentColor(color.value); setAppearanceSaved(false); }}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      accentColor === color.value ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={accentColor}
+                  onChange={(e) => { setAccentColor(e.target.value); setAppearanceSaved(false); }}
+                  className="w-10 h-10 rounded cursor-pointer border border-border bg-transparent"
+                />
+                <Input
+                  value={accentColor}
+                  onChange={(e) => { setAccentColor(e.target.value); setAppearanceSaved(false); }}
+                  placeholder="#dc2626"
+                  className="w-32 font-mono text-sm"
+                />
+                <span className="text-sm text-muted-foreground hidden sm:inline">
+                  ou choisissez n'importe quelle couleur
+                </span>
+              </div>
+            </div>
+
+            {/* Aperçu */}
+            <div className="mb-4">
+              <ThemePreview theme={VIDEO_THEMES[selectedTheme] ?? DEFAULT_THEME} accent={accentColor} />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button onClick={handleSaveAppearance} disabled={savingAppearance} variant="outline" size="sm" className="gap-2">
+                {savingAppearance ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Sauvegarder l'apparence
+              </Button>
+              {appearanceSaved && (
+                <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" /> Enregistré
+                </span>
+              )}
+            </div>
           </section>
 
           {/* Section 3 — Générer une vidéo */}

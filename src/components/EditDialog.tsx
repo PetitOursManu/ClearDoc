@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Video, Trash2, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import {
 import { PayslipItem } from '@/types/payslip';
 import { Category } from '@/types/category';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getCategories } from '@/config/apiConfig';
+import { getCategories, deleteVideo } from '@/config/apiConfig';
 
 const fallbackCategories: Category[] = [
   { id: 'salaire', title: 'Salaire' },
@@ -36,12 +37,15 @@ interface EditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (item: PayslipItem) => void;
+  onVideoDeleted?: (id: string) => void;
 }
 
-export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps) {
+export function EditDialog({ item, open, onOpenChange, onSave, onVideoDeleted }: EditDialogProps) {
   const { t } = useLanguage();
   const [categories, setCategories] = useState<Category[]>(fallbackCategories);
   const [editedItem, setEditedItem] = useState<PayslipItem | null>(null);
+  const [deletingVideo, setDeletingVideo] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -65,6 +69,22 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
     if (editedItem) {
       onSave(editedItem);
       onOpenChange(false);
+    }
+  };
+
+  const handleDeleteVideo = async () => {
+    if (!editedItem?.id) return;
+    if (!window.confirm('Supprimer la vidéo de cette fiche ? Cette action est irréversible.')) return;
+    setDeletingVideo(true);
+    setVideoError(null);
+    try {
+      await deleteVideo(editedItem.id);
+      setEditedItem({ ...editedItem, videoUrl: '' });
+      onVideoDeleted?.(editedItem.id);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : 'Erreur lors de la suppression');
+    } finally {
+      setDeletingVideo(false);
     }
   };
 
@@ -140,6 +160,32 @@ export function EditDialog({ item, open, onOpenChange, onSave }: EditDialogProps
             )}
           </div>
           
+          {editedItem.videoUrl && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                Vidéo explicative
+              </Label>
+              <div className="rounded-lg overflow-hidden border">
+                <video controls className="w-full max-h-56 bg-black">
+                  <source src={editedItem.videoUrl} type="video/mp4" />
+                </video>
+              </div>
+              {videoError && <p className="text-sm text-red-600 dark:text-red-400">{videoError}</p>}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteVideo}
+                disabled={deletingVideo}
+                className="gap-2 text-red-600 hover:text-red-700 dark:text-red-400"
+              >
+                {deletingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Supprimer la vidéo
+              </Button>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>{t('edit.field.description')}</Label>
             <RichTextEditor
