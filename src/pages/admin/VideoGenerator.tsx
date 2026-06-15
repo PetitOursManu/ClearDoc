@@ -16,7 +16,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   API_CONFIG, getData, getAdminSettings, saveAdminSettings,
-  getRemotionStatus, uninstallRemotion, getGeneratedVideos, deleteVideo, streamSSE,
+  getRemotionStatus, uninstallRemotion, getGeneratedVideos, deleteVideo,
+  publishVideo, discardVideo, streamSSE,
   type RemotionStatus, type GeneratedVideo,
 } from '@/config/apiConfig';
 import { PayslipItem } from '@/types/payslip';
@@ -55,6 +56,8 @@ export function VideoGenerator() {
   const [progress, setProgress] = useState(0);
   const [progressMsg, setProgressMsg] = useState('');
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState(false);
   const [videos, setVideos] = useState<GeneratedVideo[]>([]);
 
   useEffect(() => {
@@ -155,6 +158,7 @@ export function VideoGenerator() {
     setProgress(0);
     setProgressMsg('Initialisation...');
     setResultVideoUrl(null);
+    setPublished(false);
     setError(null);
     try {
       await streamSSE(`${API_CONFIG.adminVideosUrl}/generate/${selectedDoc}`, (data) => {
@@ -166,13 +170,40 @@ export function VideoGenerator() {
           setProgress(100);
         }
       });
-      const refreshed = await getGeneratedVideos();
-      setVideos(refreshed.videos ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handlePublish = async () => {
+    if (!resultVideoUrl || !selectedDoc) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      await publishVideo(selectedDoc, resultVideoUrl);
+      setPublished(true);
+      const refreshed = await getGeneratedVideos();
+      setVideos(refreshed.videos ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la publication');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!resultVideoUrl) return;
+    try {
+      await discardVideo(resultVideoUrl);
+    } catch {
+      // Fichier déjà absent : on ignore
+    }
+    setResultVideoUrl(null);
+    setPublished(false);
+    setProgress(0);
+    setProgressMsg('');
   };
 
   const handleDeleteVideo = async (documentId: string) => {
@@ -373,16 +404,37 @@ export function VideoGenerator() {
 
             {resultVideoUrl && (
               <div className="mt-5 space-y-3">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Aperçu — validez pour publier la vidéo sur la fiche (sous le titre, au-dessus de la description).
+                </p>
                 <video controls className="w-full rounded-xl border border-slate-200 dark:border-slate-800">
                   <source src={resultVideoUrl} type="video/mp4" />
                 </video>
-                <a
-                  href={resultVideoUrl}
-                  download
-                  className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  <Download className="h-4 w-4" /> Télécharger la vidéo
-                </a>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {published ? (
+                    <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4" /> Vidéo publiée sur la fiche
+                    </span>
+                  ) : (
+                    <>
+                      <Button onClick={handlePublish} disabled={publishing} className="gap-2">
+                        {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        Valider et publier
+                      </Button>
+                      <Button onClick={handleReject} disabled={publishing} variant="outline" className="gap-2">
+                        <XCircle className="h-4 w-4" /> Rejeter
+                      </Button>
+                    </>
+                  )}
+                  <a
+                    href={resultVideoUrl}
+                    download
+                    className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <Download className="h-4 w-4" /> Télécharger
+                  </a>
+                </div>
               </div>
             )}
           </section>

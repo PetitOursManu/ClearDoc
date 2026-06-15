@@ -448,6 +448,20 @@ export async function deleteVideo(documentId: string): Promise<any> {
   return fetchForMutation(`${API_CONFIG.adminVideosUrl}/${documentId}`, { method: 'DELETE' });
 }
 
+export async function publishVideo(documentId: string, videoUrl: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.adminVideosUrl}/publish/${documentId}`, {
+    method: 'POST',
+    body: JSON.stringify({ videoUrl }),
+  });
+}
+
+export async function discardVideo(videoUrl: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.adminVideosUrl}/discard`, {
+    method: 'POST',
+    body: JSON.stringify({ videoUrl }),
+  });
+}
+
 /**
  * Consomme un flux SSE servi via une requête POST (EventSource ne supporte que GET).
  * `onMessage` est appelé pour chaque évènement `data:` reçu.
