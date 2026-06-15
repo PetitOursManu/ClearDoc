@@ -10,6 +10,8 @@ import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
+import { spawn, execSync } from 'child_process';
+import { generateVideoForDocument } from './services/videoGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,10 +31,14 @@ const PORT = process.env.PORT || 3001;
 
 const DATA_DIR = path.join(__dirname, 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+const VIDEOS_DIR = path.join(DATA_DIR, 'videos');
+const AUDIO_DIR = path.join(DATA_DIR, 'audio');
 const DB_PATH = path.join(DATA_DIR, 'cleardoc.db');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
+if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 
@@ -113,7 +119,20 @@ db.exec(`
     pdf_id TEXT NOT NULL,
     PRIMARY KEY (company_id, pdf_id)
   );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
+
+// Ajouter la colonne video_url à la table documents si elle n'existe pas (migration idempotente)
+try {
+  db.exec('ALTER TABLE documents ADD COLUMN video_url TEXT DEFAULT NULL;');
+} catch {
+  // Colonne déjà existante, ignorer
+}
 
 // Catégories par défaut si la table est vide
 const categoriesCount = db.prepare('SELECT COUNT(*) as count FROM categories').get();
@@ -133,6 +152,16 @@ if (categoriesCount.count === 0) {
 console.log('Base de données initialisée:', DB_PATH);
 
 // ============================================
+// SETTINGS — lecture avec priorité env > base
+// ============================================
+
+function getSetting(key) {
+  return process.env[key.toUpperCase()]
+    || db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value
+    || null;
+}
+
+// ============================================
 // MIDDLEWARE
 // ============================================
 
@@ -142,6 +171,9 @@ app.use(cookieParser());
 
 // Servir les images uploadées
 app.use('/uploads', express.static(UPLOADS_DIR));
+
+// Servir les vidéos générées (volume persistant Coolify)
+app.use('/data/videos', express.static(VIDEOS_DIR));
 
 // Servir le frontend buildé en production
 const DIST_DIR = path.join(__dirname, 'dist');
@@ -310,6 +342,7 @@ function parseDocument(row) {
     title: row.title,
     description: row.description,
     imageUrl: row.image_path || '',
+    videoUrl: row.video_url || '',
     category: row.category,
     keywords: JSON.parse(row.keywords || '[]'),
     created_at: row.created_at,
@@ -796,6 +829,185 @@ app.delete('/api/company-pdfs/:company_id/:pdf_id', requireAuth, (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ROUTES - VIDEO GENERATOR (admin, protégé)
+// ============================================
+
+// Un seul render Remotion à la fois (contrainte mémoire/CPU du conteneur).
+let renderInProgress = false;
+
+const REMOTION_DIR = path.join(__dirname, 'node_modules', 'remotion');
+const VIDEOS_CODE_DIR = path.join(__dirname, 'src', 'videos');
+const ROOT_TSX_PATH = path.join(__dirname, 'src', 'Root.tsx');
+
+// Helpers SSE
+function openSse(res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+}
+
+function sseWrite(res, payload) {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+// --- Statut Remotion ---
+app.get('/api/admin/remotion/status', requireAuth, (_req, res) => {
+  const installed = fs.existsSync(REMOTION_DIR);
+  let version = null;
+  if (installed) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(REMOTION_DIR, 'package.json'), 'utf-8'));
+      version = pkg.version;
+    } catch {
+      // package.json illisible, on ignore
+    }
+  }
+  res.json({ installed, version });
+});
+
+// --- Installation Remotion (SSE) ---
+app.post('/api/admin/remotion/install', requireAuth, (_req, res) => {
+  openSse(res);
+  const send = (msg) => sseWrite(res, { log: msg });
+
+  const runCmd = (cmd) => new Promise((resolve, reject) => {
+    send(`$ ${cmd}`);
+    const proc = spawn(cmd, { shell: true, cwd: __dirname });
+    proc.stdout.on('data', d => send(d.toString()));
+    proc.stderr.on('data', d => send(d.toString()));
+    proc.on('error', err => reject(err));
+    proc.on('close', code => code === 0 ? resolve() : reject(new Error(`Commande terminée avec le code ${code}`)));
+  });
+
+  (async () => {
+    try {
+      await runCmd('npm install remotion @remotion/cli');
+      send('Installation Remotion terminée.');
+      await runCmd('npx remotion install chromium');
+      send('Installation Chromium terminée.');
+
+      for (const dir of [VIDEOS_DIR, AUDIO_DIR, VIDEOS_CODE_DIR]) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      send('Dossiers créés.');
+
+      sseWrite(res, { done: true });
+    } catch (e) {
+      sseWrite(res, { error: e.message });
+    }
+    res.end();
+  })();
+});
+
+// --- Désinstallation Remotion ---
+app.post('/api/admin/remotion/uninstall', requireAuth, (_req, res) => {
+  try {
+    execSync('npm uninstall remotion @remotion/cli', { cwd: __dirname });
+    fs.rmSync(VIDEOS_CODE_DIR, { recursive: true, force: true });
+    fs.rmSync(ROOT_TSX_PATH, { force: true });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Lecture des paramètres (clés masquées) ---
+const SETTINGS_KEYS = ['AI_API_KEY', 'AI_API_BASE_URL', 'AI_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID'];
+
+app.get('/api/admin/settings', requireAuth, (_req, res) => {
+  const result = {};
+  for (const key of SETTINGS_KEYS) {
+    const val = getSetting(key);
+    // Masquer les clés API sauf les 4 derniers caractères
+    result[key] = val
+      ? (key.includes('KEY') ? '***' + val.slice(-4) : val)
+      : '';
+    // Indiquer si la valeur provient des variables d'environnement (non modifiable en base)
+    result[`${key}__fromEnv`] = Boolean(process.env[key]);
+  }
+  res.json(result);
+});
+
+// --- Enregistrement des paramètres ---
+app.post('/api/admin/settings', requireAuth, (req, res) => {
+  try {
+    for (const [key, value] of Object.entries(req.body)) {
+      // On ignore les valeurs vides ou encore masquées (préfixe ***)
+      if (SETTINGS_KEYS.includes(key) && value && !String(value).startsWith('***')) {
+        db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)')
+          .run(key, String(value));
+      }
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Liste des documents possédant une vidéo ---
+app.get('/api/admin/videos', requireAuth, (_req, res) => {
+  try {
+    const rows = db.prepare(
+      "SELECT id, title, video_url FROM documents WHERE video_url IS NOT NULL AND video_url != '' ORDER BY title ASC"
+    ).all();
+    res.json({ videos: rows.map(r => ({ documentId: r.id, title: r.title, videoUrl: r.video_url })) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Génération d'une vidéo (SSE) ---
+app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res) => {
+  openSse(res);
+  const send = (step, message, progress) => sseWrite(res, { step, message, progress });
+
+  if (renderInProgress) {
+    sseWrite(res, { error: 'Un render est déjà en cours. Veuillez patienter.' });
+    return res.end();
+  }
+
+  renderInProgress = true;
+  try {
+    const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
+    if (!doc) throw new Error('Document introuvable');
+
+    const { videoUrl } = await generateVideoForDocument({
+      doc,
+      getSetting,
+      send,
+      projectRoot: __dirname,
+    });
+
+    db.prepare('UPDATE documents SET video_url = ? WHERE id = ?').run(videoUrl, doc.id);
+    send('done', 'Vidéo disponible', 100);
+    sseWrite(res, { done: true, videoUrl });
+  } catch (e) {
+    sseWrite(res, { error: e.message });
+  } finally {
+    renderInProgress = false;
+    res.end();
+  }
+});
+
+// --- Suppression d'une vidéo ---
+app.delete('/api/admin/videos/:documentId', requireAuth, (req, res) => {
+  try {
+    const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
+    if (!doc) return res.status(404).json({ error: 'Document introuvable' });
+
+    if (doc.video_url) {
+      const filePath = path.join(VIDEOS_DIR, path.basename(doc.video_url));
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+    db.prepare('UPDATE documents SET video_url = NULL WHERE id = ?').run(doc.id);
+    res.json({ ok: true, id: doc.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

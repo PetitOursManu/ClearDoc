@@ -11,6 +11,11 @@ export const API_CONFIG = {
   get companiesUrl() { return `${this.baseUrl}/api/companies`; },
   get pdfFilesUrl() { return `${this.baseUrl}/api/pdf-files`; },
   get companyPdfsUrl() { return `${this.baseUrl}/api/company-pdfs`; },
+  get adminSettingsUrl() { return `${this.baseUrl}/api/admin/settings`; },
+  get remotionStatusUrl() { return `${this.baseUrl}/api/admin/remotion/status`; },
+  get remotionInstallUrl() { return `${this.baseUrl}/api/admin/remotion/install`; },
+  get remotionUninstallUrl() { return `${this.baseUrl}/api/admin/remotion/uninstall`; },
+  get adminVideosUrl() { return `${this.baseUrl}/api/admin/videos`; },
 };
 
 // ============================================
@@ -407,4 +412,81 @@ export async function assignPdfToCompany(companyId: string, pdfId: string): Prom
 
 export async function unassignPdfFromCompany(companyId: string, pdfId: string): Promise<any> {
   return fetchForMutation(`${API_CONFIG.companyPdfsUrl}/${companyId}/${pdfId}`, { method: 'DELETE' });
+}
+
+// ============================================
+// VIDEO GENERATOR (admin)
+// ============================================
+
+export interface RemotionStatus { installed: boolean; version: string | null; }
+export interface GeneratedVideo { documentId: string; title: string; videoUrl: string; }
+
+export async function getAdminSettings(): Promise<Record<string, string | boolean>> {
+  return fetchForMutation(API_CONFIG.adminSettingsUrl, { method: 'GET' });
+}
+
+export async function saveAdminSettings(settings: Record<string, string>): Promise<any> {
+  return fetchForMutation(API_CONFIG.adminSettingsUrl, {
+    method: 'POST',
+    body: JSON.stringify(settings),
+  });
+}
+
+export async function getRemotionStatus(): Promise<RemotionStatus> {
+  return fetchForMutation(API_CONFIG.remotionStatusUrl, { method: 'GET' });
+}
+
+export async function uninstallRemotion(): Promise<any> {
+  return fetchForMutation(API_CONFIG.remotionUninstallUrl, { method: 'POST' });
+}
+
+export async function getGeneratedVideos(): Promise<{ videos: GeneratedVideo[] }> {
+  return fetchForMutation(API_CONFIG.adminVideosUrl, { method: 'GET' });
+}
+
+export async function deleteVideo(documentId: string): Promise<any> {
+  return fetchForMutation(`${API_CONFIG.adminVideosUrl}/${documentId}`, { method: 'DELETE' });
+}
+
+/**
+ * Consomme un flux SSE servi via une requête POST (EventSource ne supporte que GET).
+ * `onMessage` est appelé pour chaque évènement `data:` reçu.
+ */
+export async function streamSSE(
+  url: string,
+  onMessage: (data: any) => void,
+  options: RequestInit = {}
+): Promise<void> {
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const emit = (chunk: string) => {
+    const line = chunk.split('\n').find(l => l.startsWith('data:'));
+    if (!line) return;
+    const json = line.slice(5).trim();
+    if (!json) return;
+    try { onMessage(JSON.parse(json)); } catch { /* évènement non-JSON ignoré */ }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';
+    for (const part of parts) emit(part);
+  }
+  if (buffer.trim()) emit(buffer);
 }

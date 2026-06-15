@@ -56,6 +56,14 @@ export function PayslipDetail({ item, onBack }: PayslipDetailProps) {
 
         <CardContent>
           <div className="space-y-6">
+            {item.videoUrl && (
+              <div className="rounded-xl overflow-hidden">
+                <video controls width="100%" className="rounded-xl w-full">
+                  <source src={item.videoUrl} type="video/mp4" />
+                </video>
+              </div>
+            )}
+
             <div>
               <h3 className="text-lg font-semibold mb-3">Description</h3>
               <div
