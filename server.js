@@ -983,14 +983,61 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
       projectRoot: __dirname,
     });
 
-    db.prepare('UPDATE documents SET video_url = ? WHERE id = ?').run(videoUrl, doc.id);
-    send('done', 'Vidéo disponible', 100);
+    // La vidéo n'est PAS publiée automatiquement : l'admin la valide depuis l'aperçu.
+    send('done', 'Vidéo générée — à valider', 100);
     sseWrite(res, { done: true, videoUrl });
   } catch (e) {
     sseWrite(res, { error: e.message });
   } finally {
     renderInProgress = false;
     res.end();
+  }
+});
+
+// --- Validation/publication d'une vidéo sur la fiche ---
+app.post('/api/admin/videos/publish/:documentId', requireAuth, (req, res) => {
+  try {
+    const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
+    if (!doc) return res.status(404).json({ error: 'Document introuvable' });
+
+    const { videoUrl } = req.body || {};
+    if (!videoUrl || typeof videoUrl !== 'string') {
+      return res.status(400).json({ error: 'videoUrl requis' });
+    }
+
+    // Sécurité : n'accepter qu'un fichier réellement présent dans data/videos (anti path-traversal)
+    const base = path.basename(videoUrl);
+    const filePath = path.join(VIDEOS_DIR, base);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Fichier vidéo introuvable' });
+    }
+
+    const safeUrl = `/data/videos/${base}`;
+    db.prepare('UPDATE documents SET video_url = ? WHERE id = ?').run(safeUrl, doc.id);
+    res.json({ ok: true, videoUrl: safeUrl });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Rejet d'une vidéo générée mais non publiée ---
+app.post('/api/admin/videos/discard', requireAuth, (req, res) => {
+  try {
+    const { videoUrl } = req.body || {};
+    if (!videoUrl || typeof videoUrl !== 'string') {
+      return res.status(400).json({ error: 'videoUrl requis' });
+    }
+    const base = path.basename(videoUrl);
+    // Ne pas supprimer un fichier encore référencé par un document publié
+    const used = db.prepare('SELECT id FROM documents WHERE video_url = ?').get(`/data/videos/${base}`);
+    if (used) {
+      return res.status(409).json({ error: 'Vidéo publiée : utilisez la suppression depuis la liste.' });
+    }
+    const filePath = path.join(VIDEOS_DIR, base);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
