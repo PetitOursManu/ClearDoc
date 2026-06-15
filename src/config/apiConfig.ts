@@ -16,6 +16,7 @@ export const API_CONFIG = {
   get remotionInstallUrl() { return `${this.baseUrl}/api/admin/remotion/install`; },
   get remotionUninstallUrl() { return `${this.baseUrl}/api/admin/remotion/uninstall`; },
   get adminVideosUrl() { return `${this.baseUrl}/api/admin/videos`; },
+  get watermarkUrl() { return `${this.baseUrl}/api/admin/video-watermark`; },
 };
 
 // ============================================
@@ -460,6 +461,40 @@ export async function discardVideo(videoUrl: string): Promise<any> {
     method: 'POST',
     body: JSON.stringify({ videoUrl }),
   });
+}
+
+export interface WatermarkStatus { exists: boolean; url: string | null; position: string; size: string; }
+
+export async function getWatermarkStatus(): Promise<WatermarkStatus> {
+  return fetchForMutation(API_CONFIG.watermarkUrl, { method: 'GET' });
+}
+
+export async function uploadWatermark(file: File): Promise<{ ok: boolean; url: string }> {
+  const formData = new FormData();
+  formData.append('watermark', file);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  try {
+    const response = await fetch(API_CONFIG.watermarkUrl, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Erreur upload: ${response.status}`);
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw new Error('La requête a expiré.');
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function deleteWatermark(): Promise<any> {
+  return fetchForMutation(API_CONFIG.watermarkUrl, { method: 'DELETE' });
 }
 
 /**

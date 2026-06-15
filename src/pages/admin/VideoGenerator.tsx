@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Video, Settings, Sparkles, Download, Trash2, Loader2,
-  AlertCircle, CheckCircle2, XCircle, Save, PackagePlus, PackageMinus, X, Palette,
+  AlertCircle, CheckCircle2, XCircle, Save, PackagePlus, PackageMinus, X, Palette, Stamp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,10 +18,30 @@ import {
   API_CONFIG, getData, getAdminSettings, saveAdminSettings,
   getRemotionStatus, uninstallRemotion, getGeneratedVideos, deleteVideo,
   publishVideo, discardVideo, streamSSE,
+  getWatermarkStatus, uploadWatermark, deleteWatermark,
   type RemotionStatus, type GeneratedVideo,
 } from '@/config/apiConfig';
 import { PayslipItem } from '@/types/payslip';
 import { VIDEO_THEMES, DEFAULT_THEME, ACCENT_PRESETS, type VideoTheme } from '@/lib/videoThemes';
+
+const WM_POSITIONS: { value: string; label: string }[] = [
+  { value: 'top-left', label: 'Haut gauche' },
+  { value: 'top-right', label: 'Haut droite' },
+  { value: 'bottom-left', label: 'Bas gauche' },
+  { value: 'bottom-right', label: 'Bas droite' },
+];
+const WM_SIZES: { value: string; label: string }[] = [
+  { value: 'small', label: 'Petit' },
+  { value: 'medium', label: 'Moyen' },
+  { value: 'large', label: 'Grand' },
+];
+
+const WM_PREVIEW_CORNER: Record<string, string> = {
+  'top-left': 'top-2 left-2',
+  'top-right': 'top-2 right-2',
+  'bottom-left': 'bottom-2 left-2',
+  'bottom-right': 'bottom-2 right-2',
+};
 
 const SETTINGS_FIELDS: { key: string; label: string; placeholder: string; isKey: boolean }[] = [
   { key: 'AI_API_KEY', label: 'Clé API IA', placeholder: 'sk-...', isKey: true },
@@ -59,13 +79,22 @@ function ThemeCard({ theme, accent, selected, onClick }: {
   );
 }
 
-function ThemePreview({ theme, accent }: { theme: VideoTheme; accent: string }) {
+function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
+  theme: VideoTheme; accent: string; watermarkUrl?: string | null; watermarkPosition?: string;
+}) {
   return (
     <div className="rounded-lg overflow-hidden border border-border">
       <div className="text-xs text-muted-foreground px-3 py-1.5 border-b border-border bg-muted">
         Aperçu — thème {theme.name}
       </div>
-      <div className="p-6 flex flex-col items-start" style={{ background: theme.bgGradient || theme.bg, minHeight: 140 }}>
+      <div className="relative p-6 flex flex-col items-start" style={{ background: theme.bgGradient || theme.bg, minHeight: 140 }}>
+        {watermarkUrl && (
+          <img
+            src={watermarkUrl}
+            alt="Watermark"
+            className={`absolute ${WM_PREVIEW_CORNER[watermarkPosition || 'bottom-right']} h-6 w-auto object-contain pointer-events-none`}
+          />
+        )}
         <div className="flex items-center gap-2 mb-4">
           <div className="w-1 h-6 rounded" style={{ background: accent }} />
           <span
@@ -115,6 +144,12 @@ export function VideoGenerator() {
   const [accentColor, setAccentColor] = useState<string>(DEFAULT_THEME.defaultAccent);
   const [savingAppearance, setSavingAppearance] = useState(false);
   const [appearanceSaved, setAppearanceSaved] = useState(false);
+  // Watermark
+  const [watermark, setWatermark] = useState<{ exists: boolean; url: string | null }>({ exists: false, url: null });
+  const [wmPosition, setWmPosition] = useState<string>('bottom-right');
+  const [wmSize, setWmSize] = useState<string>('medium');
+  const [uploadingWatermark, setUploadingWatermark] = useState(false);
+  const wmFileRef = useRef<HTMLInputElement>(null);
 
   // --- Section génération ---
   const [documents, setDocuments] = useState<PayslipItem[]>([]);
@@ -134,8 +169,9 @@ export function VideoGenerator() {
       getRemotionStatus().catch((): RemotionStatus => ({ installed: false, version: null })),
       getData().catch(() => ({ items: [] as PayslipItem[] })),
       getGeneratedVideos().catch(() => ({ videos: [] as GeneratedVideo[] })),
+      getWatermarkStatus().catch(() => ({ exists: false, url: null, position: 'bottom-right', size: 'medium' })),
     ])
-      .then(([settingsData, remotionData, docsData, videosData]) => {
+      .then(([settingsData, remotionData, docsData, videosData, watermarkData]) => {
         const vals: Record<string, string> = {};
         const env: Record<string, boolean> = {};
         for (const f of SETTINGS_FIELDS) {
@@ -150,6 +186,10 @@ export function VideoGenerator() {
         const accentVal = settingsData['VIDEO_ACCENT_COLOR'];
         if (typeof themeVal === 'string' && VIDEO_THEMES[themeVal]) setSelectedTheme(themeVal);
         if (typeof accentVal === 'string' && accentVal) setAccentColor(accentVal);
+        // Watermark
+        setWatermark({ exists: watermarkData.exists, url: watermarkData.url });
+        if (watermarkData.position) setWmPosition(watermarkData.position);
+        if (watermarkData.size) setWmSize(watermarkData.size);
         setRemotion(remotionData);
         setDocuments((docsData.items ?? []) as PayslipItem[]);
         setVideos((videosData.videos ?? []) as GeneratedVideo[]);
@@ -228,12 +268,42 @@ export function VideoGenerator() {
     setSavingAppearance(true);
     setError(null);
     try {
-      await saveAdminSettings({ VIDEO_THEME: selectedTheme, VIDEO_ACCENT_COLOR: accentColor });
+      await saveAdminSettings({
+        VIDEO_THEME: selectedTheme,
+        VIDEO_ACCENT_COLOR: accentColor,
+        VIDEO_WATERMARK_POSITION: wmPosition,
+        VIDEO_WATERMARK_SIZE: wmSize,
+      });
       setAppearanceSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
     } finally {
       setSavingAppearance(false);
+    }
+  };
+
+  const handleUploadWatermark = async (file: File) => {
+    setUploadingWatermark(true);
+    setError(null);
+    try {
+      const res = await uploadWatermark(file);
+      setWatermark({ exists: true, url: res.url });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de l\'upload du watermark');
+    } finally {
+      setUploadingWatermark(false);
+      if (wmFileRef.current) wmFileRef.current.value = '';
+    }
+  };
+
+  const handleDeleteWatermark = async () => {
+    if (!window.confirm('Supprimer le watermark ? Les vidéos déjà générées ne sont pas modifiées.')) return;
+    setError(null);
+    try {
+      await deleteWatermark();
+      setWatermark({ exists: false, url: null });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la suppression');
     }
   };
 
@@ -507,9 +577,69 @@ export function VideoGenerator() {
               </div>
             </div>
 
+            {/* Watermark / Logo */}
+            <div className="mb-6">
+              <Label className="text-sm mb-3 flex items-center gap-2">
+                <Stamp className="h-4 w-4" />
+                Watermark (logo PNG)
+              </Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Le logo est incrusté dans un coin de toutes les vidéos générées (impossible à retirer après téléchargement).
+                Utilisez un PNG avec fond transparent.
+              </p>
+
+              <div className="flex items-center gap-3 mb-3">
+                <input
+                  ref={wmFileRef}
+                  type="file"
+                  accept=".png,image/png"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadWatermark(f); }}
+                  className="block text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-muted file:text-foreground hover:file:bg-muted/80 cursor-pointer"
+                />
+                {uploadingWatermark && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+
+              {watermark.exists && watermark.url && (
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="rounded-md border border-border bg-[repeating-conic-gradient(#e5e7eb_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] p-2">
+                    <img src={watermark.url} alt="Watermark" className="h-12 w-auto object-contain" />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleDeleteWatermark} className="gap-2 text-red-600 hover:text-red-700 dark:text-red-400">
+                    <Trash2 className="h-4 w-4" /> Supprimer le logo
+                  </Button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Coin</Label>
+                  <Select value={wmPosition} onValueChange={(v) => { setWmPosition(v); setAppearanceSaved(false); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {WM_POSITIONS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Taille</Label>
+                  <Select value={wmSize} onValueChange={(v) => { setWmSize(v); setAppearanceSaved(false); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {WM_SIZES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
             {/* Aperçu */}
             <div className="mb-4">
-              <ThemePreview theme={VIDEO_THEMES[selectedTheme] ?? DEFAULT_THEME} accent={accentColor} />
+              <ThemePreview
+                theme={VIDEO_THEMES[selectedTheme] ?? DEFAULT_THEME}
+                accent={accentColor}
+                watermarkUrl={watermark.exists ? watermark.url : null}
+                watermarkPosition={wmPosition}
+              />
             </div>
 
             <div className="flex items-center gap-3">

@@ -222,12 +222,25 @@ export async function generateAudio({ scenes, slug, apiKey, voiceId, audioDir })
 // ÉTAPE 3 — GÉNÉRATION DU COMPOSANT REMOTION (TSX)
 // ============================================
 
-export function generateTSX({ titre, scenes, slug, videosDir, theme }) {
+const WATERMARK_SIZES = { small: 90, medium: 140, large: 200 };
+
+// Construit le style CSS du watermark (coin fixe) à partir de position + taille.
+function resolveWatermarkStyle(watermark) {
+  const pos = watermark?.position || 'bottom-right';
+  const height = WATERMARK_SIZES[watermark?.size] || WATERMARK_SIZES.medium;
+  const vertical = pos.startsWith('top') ? 'top' : 'bottom';
+  const horizontal = pos.endsWith('left') ? 'left' : 'right';
+  return { position: 'absolute', [vertical]: 48, [horizontal]: 48, height, width: 'auto', opacity: 0.9, objectFit: 'contain' };
+}
+
+export function generateTSX({ titre, scenes, slug, videosDir, theme, watermark }) {
   fs.mkdirSync(videosDir, { recursive: true });
 
   const componentName = toPascalCase(slug);
   const totalFrames = scenes.reduce((sum, s) => sum + s.frames, 0);
   const themeColors = theme || resolveTheme('cleardoc', null);
+  const watermarkEnabled = Boolean(watermark?.enabled);
+  const watermarkStyle = resolveWatermarkStyle(watermark);
 
   // Pré-calcul des offsets de chaque scène pour éviter une accumulation mutable dans le rendu.
   let acc = 0;
@@ -242,7 +255,7 @@ export function generateTSX({ titre, scenes, slug, videosDir, theme }) {
   const tsx = `// Généré automatiquement par ClearDoc Video Generator — ne pas éditer à la main.
 import React from 'react';
 import {
-  AbsoluteFill, Audio, Sequence, staticFile,
+  AbsoluteFill, Audio, Img, Sequence, staticFile,
   useCurrentFrame, useVideoConfig, interpolate, spring, Easing,
 } from 'remotion';
 
@@ -251,6 +264,8 @@ const VIDEO_TITLE = ${JSON.stringify(titre)};
 const THEME = ${JSON.stringify(themeColors, null, 2)};
 const ACCENT = ${JSON.stringify(themeColors.accent)};
 const TOTAL_FRAMES = ${totalFrames};
+const WATERMARK = ${watermarkEnabled};
+const WM_STYLE = ${JSON.stringify(watermarkStyle)};
 
 const clamp = { extrapolateLeft: 'clamp' as const, extrapolateRight: 'clamp' as const };
 
@@ -348,6 +363,13 @@ export const ${componentName}: React.FC = () => {
           }}
         />
       </AbsoluteFill>
+
+      {/* Watermark — incrusté dans un coin fixe, sur toutes les scènes */}
+      {WATERMARK && (
+        <AbsoluteFill style={{ pointerEvents: 'none' }}>
+          <Img src={staticFile('branding/watermark.png')} style={WM_STYLE} />
+        </AbsoluteFill>
+      )}
     </AbsoluteFill>
   );
 };
@@ -490,6 +512,13 @@ export async function generateVideoForDocument({ doc, getSetting, send, projectR
   const accent = accentColor || getSetting('VIDEO_ACCENT_COLOR') || null;
   const resolvedTheme = resolveTheme(themeId, accent);
 
+  // Watermark : présence du fichier + position/taille en base
+  const watermark = {
+    enabled: fs.existsSync(path.join(projectRoot, 'data', 'branding', 'watermark.png')),
+    position: getSetting('VIDEO_WATERMARK_POSITION') || 'bottom-right',
+    size: getSetting('VIDEO_WATERMARK_SIZE') || 'medium',
+  };
+
   // Vérification préalable : Remotion installé ?
   if (!fs.existsSync(path.join(projectRoot, 'node_modules', 'remotion'))) {
     throw new Error('Remotion n\'est pas installé. Installez-le depuis l\'interface avant de générer une vidéo.');
@@ -525,7 +554,7 @@ export async function generateVideoForDocument({ doc, getSetting, send, projectR
 
   // Étape 3 — Composant TSX + Root.tsx
   send('tsx', 'Génération du composant vidéo...', 65);
-  const { componentName } = generateTSX({ titre, scenes: scenesWithAudio, slug, videosDir: videosCodeDir, theme: resolvedTheme });
+  const { componentName } = generateTSX({ titre, scenes: scenesWithAudio, slug, videosDir: videosCodeDir, theme: resolvedTheme, watermark });
   updateRoot({ videosDir: videosCodeDir, rootPath });
   send('tsx', 'Composant vidéo créé', 70);
 
