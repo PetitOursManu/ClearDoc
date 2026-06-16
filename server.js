@@ -182,8 +182,12 @@ app.use(cookieParser());
 // Servir les images uploadées
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Servir les vidéos générées (volume persistant Coolify)
-app.use('/data/videos', express.static(VIDEOS_DIR));
+// Servir les vidéos générées (volume persistant Coolify).
+// no-cache : force le navigateur à revalider, sinon une vidéo régénérée (même URL)
+// reste affichée depuis le cache.
+app.use('/data/videos', express.static(VIDEOS_DIR, {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+}));
 
 // Servir les éléments de marque (watermark) — volume persistant
 app.use('/data/branding', express.static(BRANDING_DIR));
