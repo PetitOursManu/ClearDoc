@@ -158,6 +158,7 @@ export function VideoGenerator() {
   const [progress, setProgress] = useState(0);
   const [progressMsg, setProgressMsg] = useState('');
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
+  const [videoBust, setVideoBust] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [videos, setVideos] = useState<GeneratedVideo[]>([]);
@@ -322,6 +323,7 @@ export function VideoGenerator() {
         if (data.error) setError(data.error);
         if (data.done && data.videoUrl) {
           setResultVideoUrl(data.videoUrl);
+          setVideoBust(Date.now());
           setProgress(100);
         }
       }, { body: JSON.stringify({ theme: selectedTheme, accentColor }) });
@@ -702,8 +704,8 @@ export function VideoGenerator() {
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Aperçu — validez pour publier la vidéo sur la fiche (sous le titre, au-dessus de la description).
                 </p>
-                <video controls className="w-full rounded-xl border border-slate-200 dark:border-slate-800">
-                  <source src={resultVideoUrl} type="video/mp4" />
+                <video key={videoBust} controls className="w-full rounded-xl border border-slate-200 dark:border-slate-800">
+                  <source src={`${resultVideoUrl}?t=${videoBust}`} type="video/mp4" />
                 </video>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -723,7 +725,7 @@ export function VideoGenerator() {
                     </>
                   )}
                   <a
-                    href={resultVideoUrl}
+                    href={`${resultVideoUrl}?t=${videoBust}`}
                     download
                     className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
                   >
