@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Video, Settings, Sparkles, Download, Trash2, Loader2,
-  AlertCircle, CheckCircle2, XCircle, Save, PackagePlus, PackageMinus, X, Palette, Stamp,
+  AlertCircle, CheckCircle2, XCircle, Save, PackagePlus, PackageMinus, X, Palette, Stamp, Coins,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,7 +87,7 @@ function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
       <div className="text-xs text-muted-foreground px-3 py-1.5 border-b border-border bg-muted">
         Aperçu — thème {theme.name}
       </div>
-      <div className="relative p-6 flex flex-col items-start" style={{ background: theme.bgGradient || theme.bg, minHeight: 140 }}>
+      <div className="relative p-6 flex flex-col items-center justify-center text-center" style={{ background: theme.bgGradient || theme.bg, minHeight: 170 }}>
         {watermarkUrl && (
           <img
             src={watermarkUrl}
@@ -95,26 +95,25 @@ function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
             className={`absolute ${WM_PREVIEW_CORNER[watermarkPosition || 'bottom-right']} h-6 w-auto object-contain pointer-events-none`}
           />
         )}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-1 h-6 rounded" style={{ background: accent }} />
+        <div
+          className="rounded-full flex items-center justify-center mb-3"
+          style={{ width: 56, height: 56, background: `${accent}14`, border: `2px solid ${accent}33` }}
+        >
+          <Coins className="h-7 w-7" style={{ color: accent }} />
+        </div>
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className="w-1 h-4 rounded" style={{ background: accent }} />
           <span
-            className="text-xs font-bold px-3 py-1 rounded-full border"
+            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border"
             style={{ background: theme.badgeBg(accent), color: theme.badgeText(accent), borderColor: `${accent}40` }}
           >
-            TITRE DE LA SECTION
+            TITRE DE LA SCÈNE
           </span>
         </div>
-        <div className="w-full rounded-xl p-4 border" style={{ background: theme.surface, borderColor: theme.surfaceBorder }}>
-          <p className="text-sm font-bold mb-1" style={{ color: theme.textPrimary }}>
-            Explication du terme de fiche de paie
-          </p>
-          <p className="text-xs" style={{ color: theme.textSecondary }}>
-            Le texte explicatif apparaît ici, généré automatiquement par l'IA à partir de la description.
-          </p>
-        </div>
-        <div className="w-full h-0.5 bg-black/10 rounded mt-4">
-          <div className="h-full w-1/3 rounded" style={{ background: accent }} />
-        </div>
+        <p className="text-sm font-extrabold" style={{ color: theme.textPrimary }}>
+          Une idée clé courte
+        </p>
+        <div className="absolute bottom-0 left-0 h-0.5 rounded" style={{ width: '33%', background: accent }} />
       </div>
     </div>
   );
