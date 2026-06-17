@@ -22,7 +22,13 @@ import {
   type RemotionStatus, type GeneratedVideo,
 } from '@/config/apiConfig';
 import { PayslipItem } from '@/types/payslip';
-import { VIDEO_THEMES, DEFAULT_THEME, ACCENT_PRESETS, type VideoTheme } from '@/lib/videoThemes';
+import { VIDEO_THEMES, DEFAULT_THEME, ACCENT_PRESETS, resolveBgPreview, type VideoTheme, type BgConfig } from '@/lib/videoThemes';
+
+const BG_MODES: { value: string; label: string }[] = [
+  { value: 'theme', label: 'Fond du thème' },
+  { value: 'solid', label: 'Couleur unie' },
+  { value: 'gradient', label: 'Dégradé' },
+];
 
 const WM_POSITIONS: { value: string; label: string }[] = [
   { value: 'top-left', label: 'Haut gauche' },
@@ -86,15 +92,16 @@ function ThemeCard({ theme, accent, selected, onClick }: {
   );
 }
 
-function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
-  theme: VideoTheme; accent: string; watermarkUrl?: string | null; watermarkPosition?: string;
+function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition, bg }: {
+  theme: VideoTheme; accent: string; watermarkUrl?: string | null; watermarkPosition?: string; bg: BgConfig;
 }) {
+  const preview = resolveBgPreview(theme, bg);
   return (
     <div className="rounded-lg overflow-hidden border border-border">
       <div className="text-xs text-muted-foreground px-3 py-1.5 border-b border-border bg-muted">
         Aperçu — thème {theme.name}
       </div>
-      <div className="relative p-6 flex flex-col items-center justify-center text-center" style={{ background: theme.bgGradient || theme.bg, minHeight: 170 }}>
+      <div className="relative p-6 flex flex-col items-center justify-center text-center" style={{ background: preview.background, minHeight: 170 }}>
         {watermarkUrl && (
           <img
             src={watermarkUrl}
@@ -128,7 +135,7 @@ function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
             TITRE DE LA SCÈNE
           </span>
         </div>
-        <p className="text-sm font-extrabold" style={{ color: theme.textPrimary }}>
+        <p className="text-sm font-extrabold" style={{ color: preview.textPrimary }}>
           Une idée clé courte
         </p>
         <div className="absolute bottom-0 left-0 h-0.5 rounded" style={{ width: '33%', background: accent }} />
@@ -168,6 +175,11 @@ export function VideoGenerator() {
   const [uploadingWatermark, setUploadingWatermark] = useState(false);
   const wmFileRef = useRef<HTMLInputElement>(null);
   const [quality, setQuality] = useState<string>('high');
+  // Fond personnalisé
+  const [bgMode, setBgMode] = useState<string>('theme');
+  const [bgColor1, setBgColor1] = useState<string>('#0f172a');
+  const [bgColor2, setBgColor2] = useState<string>('#1e293b');
+  const [bgAngle, setBgAngle] = useState<number>(135);
 
   // --- Section génération ---
   const [documents, setDocuments] = useState<PayslipItem[]>([]);
@@ -209,6 +221,15 @@ export function VideoGenerator() {
         if (typeof accentVal === 'string' && accentVal) setAccentColor(accentVal);
         const qualityVal = settingsData['VIDEO_QUALITY'];
         if (typeof qualityVal === 'string' && qualityVal) setQuality(qualityVal);
+        // Fond personnalisé
+        const bgModeVal = settingsData['VIDEO_BG_MODE'];
+        const bgC1 = settingsData['VIDEO_BG_COLOR1'];
+        const bgC2 = settingsData['VIDEO_BG_COLOR2'];
+        const bgAng = settingsData['VIDEO_BG_ANGLE'];
+        if (typeof bgModeVal === 'string' && bgModeVal) setBgMode(bgModeVal);
+        if (typeof bgC1 === 'string' && bgC1) setBgColor1(bgC1);
+        if (typeof bgC2 === 'string' && bgC2) setBgColor2(bgC2);
+        if (typeof bgAng === 'string' && bgAng && Number.isFinite(+bgAng)) setBgAngle(+bgAng);
         // Watermark
         setWatermark({ exists: watermarkData.exists, url: watermarkData.url });
         if (watermarkData.position) setWmPosition(watermarkData.position);
@@ -305,6 +326,10 @@ export function VideoGenerator() {
         VIDEO_WATERMARK_POSITION: wmPosition,
         VIDEO_WATERMARK_SIZE: wmSize,
         VIDEO_QUALITY: quality,
+        VIDEO_BG_MODE: bgMode,
+        VIDEO_BG_COLOR1: bgColor1,
+        VIDEO_BG_COLOR2: bgColor2,
+        VIDEO_BG_ANGLE: String(bgAngle),
       });
       setAppearanceSaved(true);
     } catch (err) {
@@ -358,7 +383,7 @@ export function VideoGenerator() {
           setVideoBust(Date.now());
           setProgress(100);
         }
-      }, { body: JSON.stringify({ theme: selectedTheme, accentColor, quality }) });
+      }, { body: JSON.stringify({ theme: selectedTheme, accentColor, quality, bg: { mode: bgMode, color1: bgColor1, color2: bgColor2, angle: bgAngle } }) });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
     } finally {
@@ -613,6 +638,80 @@ export function VideoGenerator() {
               </div>
             </div>
 
+            {/* Fond personnalisé */}
+            <div className="mb-6">
+              <Label className="text-sm mb-3 block">Fond</Label>
+              <Select value={bgMode} onValueChange={(v) => { setBgMode(v); setAppearanceSaved(false); }}>
+                <SelectTrigger className="sm:w-72"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {BG_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              {bgMode === 'solid' && (
+                <div className="flex items-center gap-3 mt-3">
+                  <input
+                    type="color"
+                    value={bgColor1}
+                    onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                    className="w-10 h-10 rounded cursor-pointer border border-border bg-transparent"
+                  />
+                  <Input
+                    value={bgColor1}
+                    onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                    placeholder="#0f172a"
+                    className="w-32 font-mono text-sm"
+                  />
+                </div>
+              )}
+
+              {bgMode === 'gradient' && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center gap-5 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-10">Début</span>
+                      <input
+                        type="color"
+                        value={bgColor1}
+                        onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                        className="w-10 h-10 rounded cursor-pointer border border-border bg-transparent"
+                      />
+                      <Input
+                        value={bgColor1}
+                        onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                        className="w-28 font-mono text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-10">Fin</span>
+                      <input
+                        type="color"
+                        value={bgColor2}
+                        onChange={(e) => { setBgColor2(e.target.value); setAppearanceSaved(false); }}
+                        className="w-10 h-10 rounded cursor-pointer border border-border bg-transparent"
+                      />
+                      <Input
+                        value={bgColor2}
+                        onChange={(e) => { setBgColor2(e.target.value); setAppearanceSaved(false); }}
+                        className="w-28 font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-20">Angle {bgAngle}°</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={360}
+                      value={bgAngle}
+                      onChange={(e) => { setBgAngle(+e.target.value); setAppearanceSaved(false); }}
+                      className="flex-1 max-w-xs accent-primary"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Watermark / Logo */}
             <div className="mb-6">
               <Label className="text-sm mb-3 flex items-center gap-2">
@@ -689,6 +788,7 @@ export function VideoGenerator() {
                 accent={accentColor}
                 watermarkUrl={watermark.exists ? watermark.url : null}
                 watermarkPosition={wmPosition}
+                bg={{ mode: bgMode as BgConfig['mode'], color1: bgColor1, color2: bgColor2, angle: bgAngle }}
               />
             </div>
 

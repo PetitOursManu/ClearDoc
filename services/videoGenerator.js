@@ -113,12 +113,52 @@ const THEMES = {
   },
 };
 
-// Résout un thème + une couleur d'accent en un objet de styles prêts à injecter.
-export function resolveTheme(themeId, accentColor) {
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+// Luminance relative approximative d'une couleur hex (#rrggbb)
+function lumOf(hex) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const f = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+// Choisit des couleurs de texte contrastées selon la luminance du fond
+function textColorsForLum(lum) {
+  return lum < 0.45
+    ? { textPrimary: '#f8fafc', textSecondary: '#cbd5e1' }
+    : { textPrimary: '#0f172a', textSecondary: '#475569' };
+}
+
+// Construit la surcharge de fond (uni / dégradé) à partir de la config utilisateur.
+// Retourne null si on garde le fond du thème.
+function backgroundOverride(bgConfig) {
+  if (!bgConfig || !bgConfig.mode || bgConfig.mode === 'theme') return null;
+  const c1 = String(bgConfig.color1 || '');
+  if (!HEX6.test(c1)) return null;
+  if (bgConfig.mode === 'solid') {
+    return { background: c1, bg: c1, ...textColorsForLum(lumOf(c1)) };
+  }
+  if (bgConfig.mode === 'gradient') {
+    const c2 = HEX6.test(String(bgConfig.color2 || '')) ? bgConfig.color2 : c1;
+    const angle = Number.isFinite(+bgConfig.angle) ? +bgConfig.angle : 135;
+    return {
+      background: `linear-gradient(${angle}deg, ${c1} 0%, ${c2} 100%)`,
+      bg: c1,
+      ...textColorsForLum((lumOf(c1) + lumOf(c2)) / 2),
+    };
+  }
+  return null;
+}
+
+// Résout un thème + une couleur d'accent (+ surcharge de fond optionnelle) en styles.
+export function resolveTheme(themeId, accentColor, bgConfig) {
   const t = THEMES[themeId] || THEMES.cleardoc;
   const accent = (accentColor && /^#[0-9a-fA-F]{3,8}$/.test(accentColor)) ? accentColor : t.defaultAccent;
   const v = VARIANT_STYLES[t.variant] || VARIANT_STYLES.modern;
-  return {
+  const base = {
     accent,
     variant: t.variant,
     bg: t.bg,
@@ -138,6 +178,8 @@ export function resolveTheme(themeId, accentColor) {
     iconBorderCss: v.iconBorder > 0 ? `${v.iconBorder}px solid ${accent}${v.iconKind === 'square' ? 'aa' : '33'}` : 'none',
     iconShadow: v.iconGlow > 0 ? `0 18px 64px ${accent}${Math.round(v.iconGlow * 255).toString(16).padStart(2, '0')}` : 'none',
   };
+  const override = backgroundOverride(bgConfig);
+  return override ? { ...base, ...override } : base;
 }
 
 // ============================================
@@ -819,7 +861,7 @@ export function renderVideo({ componentName, slug, projectRoot, quality = 'high'
  * @param {string} params.projectRoot   Racine du projet ClearDoc (__dirname du server)
  * @returns {Promise<{ videoUrl: string, slug: string }>}
  */
-export async function generateVideoForDocument({ doc, getSetting, send, projectRoot, theme, accentColor, quality }) {
+export async function generateVideoForDocument({ doc, getSetting, send, projectRoot, theme, accentColor, quality, bg }) {
   const videosCodeDir = path.join(projectRoot, 'src', 'videos');
   const rootPath = path.join(projectRoot, 'src', 'Root.tsx');
   const audioDir = path.join(projectRoot, 'data', 'audio');
@@ -827,7 +869,14 @@ export async function generateVideoForDocument({ doc, getSetting, send, projectR
   // Thème : valeur de la requête > réglage en base > défaut
   const themeId = theme || getSetting('VIDEO_THEME') || 'cleardoc';
   const accent = accentColor || getSetting('VIDEO_ACCENT_COLOR') || null;
-  const resolvedTheme = resolveTheme(themeId, accent);
+  // Fond personnalisé : config de la requête, sinon réglages en base
+  const bgConfig = (bg && bg.mode) ? bg : {
+    mode: getSetting('VIDEO_BG_MODE') || 'theme',
+    color1: getSetting('VIDEO_BG_COLOR1') || '',
+    color2: getSetting('VIDEO_BG_COLOR2') || '',
+    angle: getSetting('VIDEO_BG_ANGLE') || '135',
+  };
+  const resolvedTheme = resolveTheme(themeId, accent, bgConfig);
   const videoQuality = quality || getSetting('VIDEO_QUALITY') || 'high';
 
   // Watermark : présence du fichier + position/taille en base

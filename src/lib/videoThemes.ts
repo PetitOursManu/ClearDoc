@@ -95,6 +95,45 @@ export const VIDEO_THEMES: Record<string, VideoTheme> = {
 
 export const DEFAULT_THEME = VIDEO_THEMES.cleardoc;
 
+export interface BgConfig {
+  mode: 'theme' | 'solid' | 'gradient';
+  color1: string;
+  color2: string;
+  angle: number | string;
+}
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+function lumOf(hex: string): number {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const f = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+function textForLum(lum: number) {
+  return lum < 0.45
+    ? { textPrimary: '#f8fafc', textSecondary: '#cbd5e1' }
+    : { textPrimary: '#0f172a', textSecondary: '#475569' };
+}
+
+/** Calcule le fond (CSS) et les couleurs de texte pour l'aperçu, selon la config. */
+export function resolveBgPreview(theme: VideoTheme, bg: BgConfig) {
+  const themeBg = { background: theme.bgGradient || theme.bg, textPrimary: theme.textPrimary, textSecondary: theme.textSecondary };
+  if (!bg || bg.mode === 'theme' || !HEX6.test(bg.color1)) return themeBg;
+  if (bg.mode === 'solid') {
+    return { background: bg.color1, ...textForLum(lumOf(bg.color1)) };
+  }
+  const c2 = HEX6.test(bg.color2) ? bg.color2 : bg.color1;
+  const angle = Number.isFinite(+bg.angle) ? +bg.angle : 135;
+  return {
+    background: `linear-gradient(${angle}deg, ${bg.color1} 0%, ${c2} 100%)`,
+    ...textForLum((lumOf(bg.color1) + lumOf(c2)) / 2),
+  };
+}
+
 export const ACCENT_PRESETS: { name: string; value: string }[] = [
   { name: 'Rouge ClearDoc', value: '#dc2626' },
   { name: 'Bleu', value: '#2563eb' },
