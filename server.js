@@ -143,6 +143,7 @@ db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_THEME', '
 db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_ACCENT_COLOR', '#dc2626')").run();
 db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_WATERMARK_POSITION', 'bottom-right')").run();
 db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_WATERMARK_SIZE', 'medium')").run();
+db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_QUALITY', 'high')").run();
 
 // Catégories par défaut si la table est vide
 const categoriesCount = db.prepare('SELECT COUNT(*) as count FROM categories').get();
@@ -169,6 +170,14 @@ function getSetting(key) {
   return process.env[key.toUpperCase()]
     || db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value
     || null;
+}
+
+function setSetting(key, value) {
+  db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(key, String(value));
+}
+
+function delSetting(key) {
+  db.prepare('DELETE FROM settings WHERE key = ?').run(key);
 }
 
 // ============================================
@@ -953,6 +962,7 @@ app.post('/api/admin/remotion/uninstall', requireAuth, (_req, res) => {
 const SETTINGS_KEYS = [
   'AI_API_KEY', 'AI_API_BASE_URL', 'AI_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID',
   'VIDEO_THEME', 'VIDEO_ACCENT_COLOR', 'VIDEO_WATERMARK_POSITION', 'VIDEO_WATERMARK_SIZE',
+  'VIDEO_QUALITY',
 ];
 
 app.get('/api/admin/settings', requireAuth, (_req, res) => {
@@ -1027,6 +1037,28 @@ app.get('/api/admin/videos', requireAuth, (_req, res) => {
   }
 });
 
+// --- Dernière vidéo générée mais non encore validée ---
+app.get('/api/admin/videos/pending', requireAuth, (_req, res) => {
+  try {
+    const raw = getSetting('VIDEO_PENDING');
+    if (!raw) return res.json({ pending: null });
+    let p;
+    try { p = JSON.parse(raw); } catch { delSetting('VIDEO_PENDING'); return res.json({ pending: null }); }
+    const base = path.basename(p.videoUrl || '');
+    // Fichier disparu (conteneur recréé, etc.) -> on nettoie
+    if (!base || !fs.existsSync(path.join(VIDEOS_DIR, base))) {
+      delSetting('VIDEO_PENDING');
+      return res.json({ pending: null });
+    }
+    // Déjà publiée entre-temps -> plus "en attente"
+    const published = db.prepare('SELECT id FROM documents WHERE video_url = ?').get(`/data/videos/${base}`);
+    if (published) { delSetting('VIDEO_PENDING'); return res.json({ pending: null }); }
+    res.json({ pending: { documentId: p.documentId, title: p.title, videoUrl: `/data/videos/${base}`, createdAt: p.createdAt || null } });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Génération d'une vidéo (SSE) ---
 app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res) => {
   openSse(res);
@@ -1048,7 +1080,7 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
     const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
     if (!doc) throw new Error('Document introuvable');
 
-    const { theme, accentColor } = req.body || {};
+    const { theme, accentColor, quality } = req.body || {};
     const { videoUrl } = await generateVideoForDocument({
       doc,
       getSetting,
@@ -1056,9 +1088,14 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
       projectRoot: __dirname,
       theme,
       accentColor,
+      quality,
     });
 
     // La vidéo n'est PAS publiée automatiquement : l'admin la valide depuis l'aperçu.
+    // On mémorise la dernière vidéo non validée pour pouvoir la revoir plus tard.
+    setSetting('VIDEO_PENDING', JSON.stringify({
+      documentId: doc.id, title: doc.title, videoUrl, createdAt: Date.now(),
+    }));
     send('done', 'Vidéo générée — à valider', 100);
     sseWrite(res, { done: true, videoUrl });
   } catch (e) {
@@ -1090,6 +1127,11 @@ app.post('/api/admin/videos/publish/:documentId', requireAuth, (req, res) => {
 
     const safeUrl = `/data/videos/${base}`;
     db.prepare('UPDATE documents SET video_url = ? WHERE id = ?').run(safeUrl, doc.id);
+    // La vidéo en attente vient d'être publiée -> on l'oublie
+    const pendingRaw = getSetting('VIDEO_PENDING');
+    if (pendingRaw) {
+      try { if (JSON.parse(pendingRaw).documentId === doc.id) delSetting('VIDEO_PENDING'); } catch { /* ignore */ }
+    }
     res.json({ ok: true, videoUrl: safeUrl });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1111,6 +1153,11 @@ app.post('/api/admin/videos/discard', requireAuth, (req, res) => {
     }
     const filePath = path.join(VIDEOS_DIR, base);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Si c'était la vidéo en attente, on l'oublie
+    const pendingRaw = getSetting('VIDEO_PENDING');
+    if (pendingRaw) {
+      try { if (path.basename(JSON.parse(pendingRaw).videoUrl || '') === base) delSetting('VIDEO_PENDING'); } catch { /* ignore */ }
+    }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });

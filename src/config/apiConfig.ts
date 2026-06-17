@@ -445,6 +445,12 @@ export async function getGeneratedVideos(): Promise<{ videos: GeneratedVideo[] }
   return fetchForMutation(API_CONFIG.adminVideosUrl, { method: 'GET' });
 }
 
+export interface PendingVideo { documentId: string; title: string; videoUrl: string; createdAt: number | null; }
+
+export async function getPendingVideo(): Promise<{ pending: PendingVideo | null }> {
+  return fetchForMutation(`${API_CONFIG.adminVideosUrl}/pending`, { method: 'GET' });
+}
+
 export async function deleteVideo(documentId: string): Promise<any> {
   return fetchForMutation(`${API_CONFIG.adminVideosUrl}/${documentId}`, { method: 'DELETE' });
 }

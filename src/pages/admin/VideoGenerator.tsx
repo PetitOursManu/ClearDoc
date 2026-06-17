@@ -18,7 +18,7 @@ import {
   API_CONFIG, getData, getAdminSettings, saveAdminSettings,
   getRemotionStatus, uninstallRemotion, getGeneratedVideos, deleteVideo,
   publishVideo, discardVideo, streamSSE,
-  getWatermarkStatus, uploadWatermark, deleteWatermark,
+  getWatermarkStatus, uploadWatermark, deleteWatermark, getPendingVideo,
   type RemotionStatus, type GeneratedVideo,
 } from '@/config/apiConfig';
 import { PayslipItem } from '@/types/payslip';
@@ -34,6 +34,12 @@ const WM_SIZES: { value: string; label: string }[] = [
   { value: 'small', label: 'Petit' },
   { value: 'medium', label: 'Moyen' },
   { value: 'large', label: 'Grand' },
+];
+
+const QUALITY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'high', label: 'Haute (1080p, ~CRF 18)' },
+  { value: 'standard', label: 'Standard (1080p, plus léger)' },
+  { value: 'light', label: 'Légère (1080p, mini-poids)' },
 ];
 
 const WM_PREVIEW_CORNER: Record<string, string> = {
@@ -58,6 +64,7 @@ function ThemeCard({ theme, accent, selected, onClick }: {
     <button
       type="button"
       onClick={onClick}
+      title={theme.description}
       className={`rounded-lg overflow-hidden border-2 transition-all text-left ${
         selected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
       }`}
@@ -95,12 +102,23 @@ function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
             className={`absolute ${WM_PREVIEW_CORNER[watermarkPosition || 'bottom-right']} h-6 w-auto object-contain pointer-events-none`}
           />
         )}
-        <div
-          className="rounded-full flex items-center justify-center mb-3"
-          style={{ width: 56, height: 56, background: `${accent}14`, border: `2px solid ${accent}33` }}
-        >
-          <Coins className="h-7 w-7" style={{ color: accent }} />
-        </div>
+        {theme.variant === 'minimal' ? (
+          <div className="mb-3"><Coins className="h-9 w-9" style={{ color: accent }} /></div>
+        ) : (
+          <div
+            className="flex items-center justify-center mb-3"
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: theme.variant === 'cyber' ? 10 : theme.variant === 'curvy' ? '42% 58% 56% 44% / 48% 42% 58% 52%' : '50%',
+              background: theme.variant === 'curvy' ? accent : `${accent}14`,
+              border: theme.variant === 'curvy' ? 'none' : `2px solid ${accent}33`,
+              boxShadow: theme.variant === 'cyber' ? `0 0 18px ${accent}66` : 'none',
+            }}
+          >
+            <Coins className="h-7 w-7" style={{ color: theme.variant === 'curvy' ? '#ffffff' : accent }} />
+          </div>
+        )}
         <div className="flex items-center gap-1.5 mb-2">
           <div className="w-1 h-4 rounded" style={{ background: accent }} />
           <span
@@ -149,6 +167,7 @@ export function VideoGenerator() {
   const [wmSize, setWmSize] = useState<string>('medium');
   const [uploadingWatermark, setUploadingWatermark] = useState(false);
   const wmFileRef = useRef<HTMLInputElement>(null);
+  const [quality, setQuality] = useState<string>('high');
 
   // --- Section génération ---
   const [documents, setDocuments] = useState<PayslipItem[]>([]);
@@ -158,6 +177,7 @@ export function VideoGenerator() {
   const [progressMsg, setProgressMsg] = useState('');
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [videoBust, setVideoBust] = useState(0);
+  const [isPending, setIsPending] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [videos, setVideos] = useState<GeneratedVideo[]>([]);
@@ -170,8 +190,9 @@ export function VideoGenerator() {
       getData().catch(() => ({ items: [] as PayslipItem[] })),
       getGeneratedVideos().catch(() => ({ videos: [] as GeneratedVideo[] })),
       getWatermarkStatus().catch(() => ({ exists: false, url: null, position: 'bottom-right', size: 'medium' })),
+      getPendingVideo().catch(() => ({ pending: null })),
     ])
-      .then(([settingsData, remotionData, docsData, videosData, watermarkData]) => {
+      .then(([settingsData, remotionData, docsData, videosData, watermarkData, pendingData]) => {
         const vals: Record<string, string> = {};
         const env: Record<string, boolean> = {};
         for (const f of SETTINGS_FIELDS) {
@@ -186,6 +207,8 @@ export function VideoGenerator() {
         const accentVal = settingsData['VIDEO_ACCENT_COLOR'];
         if (typeof themeVal === 'string' && VIDEO_THEMES[themeVal]) setSelectedTheme(themeVal);
         if (typeof accentVal === 'string' && accentVal) setAccentColor(accentVal);
+        const qualityVal = settingsData['VIDEO_QUALITY'];
+        if (typeof qualityVal === 'string' && qualityVal) setQuality(qualityVal);
         // Watermark
         setWatermark({ exists: watermarkData.exists, url: watermarkData.url });
         if (watermarkData.position) setWmPosition(watermarkData.position);
@@ -193,6 +216,14 @@ export function VideoGenerator() {
         setRemotion(remotionData);
         setDocuments((docsData.items ?? []) as PayslipItem[]);
         setVideos((videosData.videos ?? []) as GeneratedVideo[]);
+        // Dernière vidéo non validée : on la repropose pour validation
+        const pending = pendingData.pending;
+        if (pending) {
+          setSelectedDoc(pending.documentId);
+          setResultVideoUrl(pending.videoUrl);
+          setVideoBust(Date.now());
+          setIsPending(true);
+        }
       })
       .finally(() => setLoading(false));
   }, [isAdmin, navigate]);
@@ -273,6 +304,7 @@ export function VideoGenerator() {
         VIDEO_ACCENT_COLOR: accentColor,
         VIDEO_WATERMARK_POSITION: wmPosition,
         VIDEO_WATERMARK_SIZE: wmSize,
+        VIDEO_QUALITY: quality,
       });
       setAppearanceSaved(true);
     } catch (err) {
@@ -314,6 +346,7 @@ export function VideoGenerator() {
     setProgressMsg('Initialisation...');
     setResultVideoUrl(null);
     setPublished(false);
+    setIsPending(false);
     setError(null);
     try {
       await streamSSE(`${API_CONFIG.adminVideosUrl}/generate/${selectedDoc}`, (data) => {
@@ -325,7 +358,7 @@ export function VideoGenerator() {
           setVideoBust(Date.now());
           setProgress(100);
         }
-      }, { body: JSON.stringify({ theme: selectedTheme, accentColor }) });
+      }, { body: JSON.stringify({ theme: selectedTheme, accentColor, quality }) });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
     } finally {
@@ -340,6 +373,7 @@ export function VideoGenerator() {
     try {
       await publishVideo(selectedDoc, resultVideoUrl);
       setPublished(true);
+      setIsPending(false);
       const refreshed = await getGeneratedVideos();
       setVideos(refreshed.videos ?? []);
     } catch (err) {
@@ -358,6 +392,7 @@ export function VideoGenerator() {
     }
     setResultVideoUrl(null);
     setPublished(false);
+    setIsPending(false);
     setProgress(0);
     setProgressMsg('');
   };
@@ -633,6 +668,20 @@ export function VideoGenerator() {
               </div>
             </div>
 
+            {/* Qualité / poids de la vidéo */}
+            <div className="mb-6">
+              <Label className="text-sm mb-2 block">Qualité vidéo (poids du fichier)</Label>
+              <Select value={quality} onValueChange={(v) => { setQuality(v); setAppearanceSaved(false); }}>
+                <SelectTrigger className="sm:w-80"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {QUALITY_OPTIONS.map(q => <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Rendu en 1080p natif (au lieu de 2880×1620) → fichiers bien plus légers à qualité équivalente.
+              </p>
+            </div>
+
             {/* Aperçu */}
             <div className="mb-4">
               <ThemePreview
@@ -700,6 +749,12 @@ export function VideoGenerator() {
 
             {resultVideoUrl && (
               <div className="mt-5 space-y-3">
+                {isPending && !published && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    Dernière vidéo générée mais non validée — vous pouvez la valider ou la rejeter.
+                  </div>
+                )}
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Aperçu — validez pour publier la vidéo sur la fiche (sous le titre, au-dessus de la description).
                 </p>

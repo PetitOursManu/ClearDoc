@@ -19,44 +19,108 @@ const HEIGHT = 1080;
 // Ne contient que ce dont le render a besoin.
 // ============================================
 
+// Packs de style par "variant" : chaque variant change le fond, les formes,
+// la police et le ressenti des animations (pas seulement les couleurs).
+const VARIANT_STYLES = {
+  modern: {
+    bgKind: 'blobs', font: 'Arial, sans-serif',
+    iconKind: 'circle', iconRadius: '50%', iconBorder: 3, iconGlow: 0.14, iconFill: false,
+    badgeKind: 'pill', badgeMono: false, badgeUpper: false, badgeLetter: 0,
+    spring: { damping: 12, stiffness: 130, mass: 0.7 }, enterX: 70, pulse: true,
+  },
+  cyber: {
+    bgKind: 'grid', font: '"Courier New", ui-monospace, monospace',
+    iconKind: 'square', iconRadius: 16, iconBorder: 2, iconGlow: 0.6, iconFill: false,
+    badgeKind: 'bracket', badgeMono: true, badgeUpper: true, badgeLetter: 4,
+    spring: { damping: 200, stiffness: 200, mass: 0.6 }, enterX: 50, pulse: true,
+  },
+  curvy: {
+    bgKind: 'waves', font: 'Arial, sans-serif',
+    iconKind: 'squircle', iconRadius: '42% 58% 56% 44% / 48% 42% 58% 52%', iconBorder: 0, iconGlow: 0.32, iconFill: true,
+    badgeKind: 'pill', badgeMono: false, badgeUpper: false, badgeLetter: 0,
+    spring: { damping: 8, stiffness: 120, mass: 0.9 }, enterX: 90, pulse: false,
+  },
+  minimal: {
+    bgKind: 'plain', font: 'Arial, sans-serif',
+    iconKind: 'bare', iconRadius: '50%', iconBorder: 0, iconGlow: 0, iconFill: false,
+    badgeKind: 'underline', badgeMono: false, badgeUpper: true, badgeLetter: 2,
+    spring: { damping: 200, stiffness: 120, mass: 1 }, enterX: 0, pulse: false,
+  },
+};
+
 const THEMES = {
   cleardoc: {
+    variant: 'modern',
     bg: '#f8f9fa', bgGradient: '#f8f9fa', surface: '#ffffff', surfaceBorder: '#e2e8f0',
     textPrimary: '#1e293b', textSecondary: '#64748b', defaultAccent: '#dc2626',
     badgeBg: (a) => `${a}18`, badgeText: (a) => a, transition: 'slide',
   },
+  moderne: {
+    variant: 'modern',
+    bg: '#f5f7fb', bgGradient: 'linear-gradient(135deg, #eef2ff 0%, #f5f7fb 100%)',
+    surface: '#ffffff', surfaceBorder: '#e2e8f0',
+    textPrimary: '#0f172a', textSecondary: '#64748b', defaultAccent: '#6366f1',
+    badgeBg: (a) => `${a}16`, badgeText: (a) => a, transition: 'slide',
+  },
   arctic: {
+    variant: 'modern',
     bg: '#f0f7ff', bgGradient: 'linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%)',
     surface: '#ffffff', surfaceBorder: '#bfdbfe',
     textPrimary: '#1e293b', textSecondary: '#475569', defaultAccent: '#2563eb',
     badgeBg: (a) => `${a}15`, badgeText: (a) => a, transition: 'slide',
   },
   noir: {
+    variant: 'modern',
     bg: '#0f172a', bgGradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
     surface: '#1e293b', surfaceBorder: '#334155',
     textPrimary: '#f1f5f9', textSecondary: '#94a3b8', defaultAccent: '#dc2626',
     badgeBg: (a) => `${a}30`, badgeText: (a) => `${a}dd`, transition: 'fade',
   },
   doux: {
+    variant: 'modern',
     bg: '#fdf4ff', bgGradient: 'linear-gradient(135deg, #fdf4ff 0%, #f0fdf4 100%)',
     surface: '#ffffff', surfaceBorder: '#e9d5ff',
     textPrimary: '#1e293b', textSecondary: '#6b7280', defaultAccent: '#d946ef',
     badgeBg: (a) => `${a}15`, badgeText: (a) => a, transition: 'fade',
   },
   foret: {
+    variant: 'modern',
     bg: '#0f2417', bgGradient: 'linear-gradient(135deg, #0f2417 0%, #1a3a25 100%)',
     surface: '#1a3a25', surfaceBorder: '#2d6a40',
     textPrimary: '#f0fdf4', textSecondary: '#86efac', defaultAccent: '#16a34a',
     badgeBg: (a) => `${a}30`, badgeText: () => '#86efac', transition: 'slide',
   },
+  cyber: {
+    variant: 'cyber',
+    bg: '#05060a', bgGradient: 'linear-gradient(135deg, #05060a 0%, #0a0f1f 100%)',
+    surface: '#0c1424', surfaceBorder: '#1f2a44',
+    textPrimary: '#e2f6ff', textSecondary: '#7dd3fc', defaultAccent: '#22d3ee',
+    badgeBg: (a) => `${a}22`, badgeText: (a) => a, transition: 'fade',
+  },
+  courbe: {
+    variant: 'curvy',
+    bg: '#15102e', bgGradient: 'linear-gradient(135deg, #1e1147 0%, #3a1d6e 100%)',
+    surface: '#ffffff', surfaceBorder: '#e9d5ff',
+    textPrimary: '#fdf4ff', textSecondary: '#d8b4fe', defaultAccent: '#fb7185',
+    badgeBg: (a) => `${a}26`, badgeText: () => '#ffffff', transition: 'slide',
+    bgColors: ['#fb7185', '#fbbf24', '#a78bfa', '#34d399'],
+  },
+  sobre: {
+    variant: 'minimal',
+    bg: '#fafafa', bgGradient: '#fafafa', surface: '#ffffff', surfaceBorder: '#e5e5e5',
+    textPrimary: '#18181b', textSecondary: '#71717a', defaultAccent: '#0f172a',
+    badgeBg: (a) => `${a}12`, badgeText: (a) => a, transition: 'fade',
+  },
 };
 
-// Résout un thème + une couleur d'accent en un objet de couleurs prêtes à injecter.
-function resolveTheme(themeId, accentColor) {
+// Résout un thème + une couleur d'accent en un objet de styles prêts à injecter.
+export function resolveTheme(themeId, accentColor) {
   const t = THEMES[themeId] || THEMES.cleardoc;
   const accent = (accentColor && /^#[0-9a-fA-F]{3,8}$/.test(accentColor)) ? accentColor : t.defaultAccent;
+  const v = VARIANT_STYLES[t.variant] || VARIANT_STYLES.modern;
   return {
     accent,
+    variant: t.variant,
     bg: t.bg,
     background: t.bgGradient || t.bg,
     surface: t.surface,
@@ -66,6 +130,13 @@ function resolveTheme(themeId, accentColor) {
     badgeBg: t.badgeBg(accent),
     badgeText: t.badgeText(accent),
     transition: t.transition,
+    bgColors: t.bgColors || [accent],
+    ...v,
+    // Styles d'icône dérivés du variant + accent
+    iconBg: v.iconFill ? accent : `${accent}14`,
+    iconColor: v.iconFill ? '#ffffff' : accent,
+    iconBorderCss: v.iconBorder > 0 ? `${v.iconBorder}px solid ${accent}${v.iconKind === 'square' ? 'aa' : '33'}` : 'none',
+    iconShadow: v.iconGlow > 0 ? `0 18px 64px ${accent}${Math.round(v.iconGlow * 255).toString(16).padStart(2, '0')}` : 'none',
   };
 }
 
@@ -339,18 +410,55 @@ const clamp = { extrapolateLeft: 'clamp' as const, extrapolateRight: 'clamp' as 
 const formatNumber = (value: number, decimals: number) =>
   value.toLocaleString('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
-// Fond animé continu : dégradé + grille de points + blobs flous qui dérivent
+// Fond animé continu — le style dépend du variant du thème.
 const AnimatedBg: React.FC = () => {
   const frame = useCurrentFrame();
+  const kind = THEME.bgKind;
+  const colors = THEME.bgColors;
+
+  if (kind === 'plain') {
+    // Minimal : fond uni + halo accent qui respire doucement
+    const pulse = 0.05 + Math.sin(frame / 50) * 0.02;
+    return (
+      <AbsoluteFill style={{ background: THEME.background, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', left: '50%', top: '44%', width: 1200, height: 1200, borderRadius: '50%', background: ACCENT, opacity: pulse, filter: 'blur(150px)', transform: 'translate(-50%, -50%)' }} />
+      </AbsoluteFill>
+    );
+  }
+
+  if (kind === 'grid') {
+    // Cyber : grille néon qui défile + halo + vignette
+    const shift = frame % 64;
+    return (
+      <AbsoluteFill style={{ background: THEME.background, overflow: 'hidden' }}>
+        <AbsoluteFill
+          style={{
+            backgroundImage: \`linear-gradient(\${ACCENT}24 1px, transparent 1px), linear-gradient(90deg, \${ACCENT}24 1px, transparent 1px)\`,
+            backgroundSize: '64px 64px',
+            backgroundPosition: \`0px \${shift}px\`,
+            opacity: 0.55,
+          }}
+        />
+        <div style={{ position: 'absolute', left: '50%', top: '50%', width: 1500, height: 950, borderRadius: '50%', background: ACCENT, opacity: 0.1, filter: 'blur(170px)', transform: 'translate(-50%, -50%)' }} />
+        <AbsoluteFill style={{ background: 'radial-gradient(circle at 50% 45%, transparent 32%, rgba(0,0,0,0.55) 100%)' }} />
+      </AbsoluteFill>
+    );
+  }
+
+  // 'blobs' (modern) et 'waves' (curvy) : blobs flous dérivants (plus gros & colorés en 'waves')
+  const big = kind === 'waves';
   const blobs = [
-    { x: 16, y: 22, r: 540, phase: 0, amp: 36 },
-    { x: 84, y: 74, r: 480, phase: 2.2, amp: 46 },
-    { x: 72, y: 14, r: 340, phase: 4.1, amp: 28 },
+    { x: 16, y: 22, r: big ? 780 : 540, phase: 0, amp: big ? 60 : 36 },
+    { x: 84, y: 74, r: big ? 720 : 480, phase: 2.2, amp: big ? 74 : 46 },
+    { x: 72, y: 12, r: big ? 540 : 340, phase: 4.1, amp: big ? 50 : 28 },
+    { x: 32, y: 82, r: big ? 480 : 0, phase: 1.3, amp: 56 },
   ];
   return (
     <AbsoluteFill style={{ background: THEME.background, overflow: 'hidden' }}>
-      <AbsoluteFill style={{ backgroundImage: \`radial-gradient(\${THEME.textSecondary}1f 1.6px, transparent 1.6px)\`, backgroundSize: '46px 46px', opacity: 0.4 }} />
-      {blobs.map((b, i) => (
+      {kind === 'blobs' && (
+        <AbsoluteFill style={{ backgroundImage: \`radial-gradient(\${THEME.textSecondary}1f 1.6px, transparent 1.6px)\`, backgroundSize: '46px 46px', opacity: 0.4 }} />
+      )}
+      {blobs.filter((b) => b.r > 0).map((b, i) => (
         <div
           key={i}
           style={{
@@ -360,10 +468,10 @@ const AnimatedBg: React.FC = () => {
             width: b.r,
             height: b.r,
             borderRadius: '50%',
-            background: ACCENT,
-            opacity: 0.13,
-            filter: 'blur(90px)',
-            transform: \`translate(-50%, -50%) translateY(\${Math.sin(frame / 42 + b.phase) * b.amp}px)\`,
+            background: colors[i % colors.length],
+            opacity: big ? 0.28 : 0.13,
+            filter: big ? 'blur(70px)' : 'blur(90px)',
+            transform: \`translate(-50%, -50%) translateY(\${Math.sin(frame / (big ? 34 : 42) + b.phase) * b.amp}px)\`,
           }}
         />
       ))}
@@ -378,12 +486,10 @@ const Scene: React.FC<{ scene: any; total: number }> = ({ scene, total }) => {
 
   // Transition d'entrée/sortie de la scène (le fond animé reste, lui, continu)
   const inOut = interpolate(frame, [0, 16, sceneFrames - 16, sceneFrames], [0, 1, 1, 0], clamp);
-  const slideX = THEME.transition === 'slide'
-    ? interpolate(frame, [0, 20], [70, 0], { ...clamp, easing: Easing.out(Easing.cubic) })
-    : 0;
+  const slideX = interpolate(frame, [0, 20], [THEME.enterX, 0], { ...clamp, easing: Easing.out(Easing.cubic) });
 
-  // Icône : apparition en spring (léger rebond) + flottement continu
-  const iconSpring = spring({ frame: frame - 4, fps, config: { damping: 11, stiffness: 130, mass: 0.7 } });
+  // Icône : apparition en spring (ressenti selon le variant) + flottement continu
+  const iconSpring = spring({ frame: frame - 4, fps, config: THEME.spring });
   const iconScale = interpolate(iconSpring, [0, 1], [0.4, 1]);
   const iconOpacity = interpolate(frame, [2, 16], [0, 1], clamp);
   const float = Math.sin(frame / 16) * 7;
@@ -429,67 +535,86 @@ const Scene: React.FC<{ scene: any; total: number }> = ({ scene, total }) => {
         ))}
       </div>
 
-      {/* Icône + anneaux qui pulsent */}
-      <div style={{ position: 'relative', width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44, transform: \`translateY(\${float}px)\` }}>
-        {[0, 1].map((r) => {
-          const raw = ((frame - r * 18) % 72) / 72;
-          const t = raw < 0 ? raw + 1 : raw;
-          return (
-            <div
-              key={r}
-              style={{
-                position: 'absolute',
-                width: 260,
-                height: 260,
-                borderRadius: '50%',
-                border: \`2px solid \${ACCENT}\`,
-                opacity: (1 - t) * 0.35 * iconOpacity,
-                transform: \`scale(\${1 + t * 0.7})\`,
-              }}
-            />
-          );
-        })}
-        <div
-          style={{
-            width: 260,
-            height: 260,
-            borderRadius: '50%',
-            background: \`\${ACCENT}14\`,
-            border: \`3px solid \${ACCENT}33\`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: iconOpacity,
-            transform: \`scale(\${iconScale})\`,
-            boxShadow: \`0 16px 56px \${ACCENT}22\`,
-          }}
-        >
-          <Icon size={140} color={ACCENT} strokeWidth={1.75} />
+      {/* Icône — forme & traitement selon le variant */}
+      {THEME.iconKind === 'bare' ? (
+        <div style={{ marginBottom: 40, opacity: iconOpacity, transform: \`translateY(\${float}px) scale(\${iconScale})\` }}>
+          <Icon size={150} color={THEME.iconColor} strokeWidth={1.5} />
         </div>
-      </div>
+      ) : (
+        <div style={{ position: 'relative', width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44, transform: \`translateY(\${float}px)\` }}>
+          {THEME.pulse && [0, 1].map((r) => {
+            const raw = ((frame - r * 18) % 72) / 72;
+            const t = raw < 0 ? raw + 1 : raw;
+            return (
+              <div
+                key={r}
+                style={{
+                  position: 'absolute',
+                  width: 260,
+                  height: 260,
+                  borderRadius: THEME.iconRadius,
+                  border: \`2px solid \${ACCENT}\`,
+                  opacity: (1 - t) * 0.32 * iconOpacity,
+                  transform: \`scale(\${1 + t * 0.7})\`,
+                }}
+              />
+            );
+          })}
+          <div
+            style={{
+              width: 260,
+              height: 260,
+              borderRadius: THEME.iconRadius,
+              background: THEME.iconBg,
+              border: THEME.iconBorderCss,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: iconOpacity,
+              transform: \`scale(\${iconScale})\`,
+              boxShadow: THEME.iconShadow,
+            }}
+          >
+            <Icon size={140} color={THEME.iconColor} strokeWidth={1.75} />
+          </div>
+        </div>
+      )}
 
-      {/* Badge titre */}
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 24, opacity: badgeOpacity, transform: \`translateY(\${badgeY}px)\` }}>
-        <div style={{ width: 6, height: 30, background: ACCENT, borderRadius: 3 }} />
-        <div
-          style={{
-            background: THEME.badgeBg,
-            color: THEME.badgeText,
-            border: \`2px solid \${ACCENT}40\`,
-            fontSize: 26,
-            fontWeight: 700,
-            fontFamily: 'Arial, sans-serif',
-            padding: '8px 26px',
-            borderRadius: 999,
-          }}
-        >
-          {titre}
+      {/* Badge titre — forme selon le variant */}
+      {THEME.badgeKind === 'underline' ? (
+        <div style={{ marginBottom: 24, opacity: badgeOpacity, transform: \`translateY(\${badgeY}px)\` }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: THEME.badgeText, fontFamily: THEME.font, textTransform: THEME.badgeUpper ? 'uppercase' : 'none', letterSpacing: THEME.badgeLetter }}>{titre}</div>
+          <div style={{ height: 3, width: 90, background: ACCENT, borderRadius: 3, margin: '12px auto 0' }} />
         </div>
-      </div>
+      ) : THEME.badgeKind === 'bracket' ? (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 24, opacity: badgeOpacity, transform: \`translateY(\${badgeY}px)\`, fontFamily: THEME.font }}>
+          <span style={{ color: ACCENT, fontSize: 34, fontWeight: 700 }}>{'['}</span>
+          <span style={{ fontSize: 24, fontWeight: 700, color: THEME.badgeText, textTransform: 'uppercase', letterSpacing: THEME.badgeLetter }}>{titre}</span>
+          <span style={{ color: ACCENT, fontSize: 34, fontWeight: 700 }}>{']'}</span>
+        </div>
+      ) : (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 24, opacity: badgeOpacity, transform: \`translateY(\${badgeY}px)\` }}>
+          <div style={{ width: 6, height: 30, background: ACCENT, borderRadius: 3 }} />
+          <div
+            style={{
+              background: THEME.badgeBg,
+              color: THEME.badgeText,
+              border: \`2px solid \${ACCENT}40\`,
+              fontSize: 26,
+              fontWeight: 700,
+              fontFamily: THEME.font,
+              padding: '8px 26px',
+              borderRadius: 999,
+            }}
+          >
+            {titre}
+          </div>
+        </div>
+      )}
 
       {/* Compteur de montant (si présent) */}
       {chiffre != null && (
-        <div style={{ fontSize: 116, fontWeight: 900, color: ACCENT, fontFamily: 'Arial, sans-serif', lineHeight: 1, marginBottom: 18, opacity: numberOpacity }}>
+        <div style={{ fontSize: 116, fontWeight: 900, color: ACCENT, fontFamily: THEME.font, lineHeight: 1, marginBottom: 18, opacity: numberOpacity }}>
           {formatNumber(countValue, decimals)}{suffixe ? ' ' + suffixe : ''}
         </div>
       )}
@@ -508,7 +633,7 @@ const Scene: React.FC<{ scene: any; total: number }> = ({ scene, total }) => {
                 fontSize: chiffre != null ? 44 : 60,
                 fontWeight: 800,
                 color: THEME.textPrimary,
-                fontFamily: 'Arial, sans-serif',
+                fontFamily: THEME.font,
                 lineHeight: 1.3,
                 opacity: o,
                 transform: \`translateY(\${y}px)\`,
@@ -624,19 +749,24 @@ registerRoot(RemotionRoot);
 // ÉTAPE 5 — RENDER REMOTION
 // ============================================
 
+// Qualité -> CRF h264 (plus bas = meilleure qualité / plus lourd).
+// 18 ≈ visuellement sans perte ; on rend en 1080p natif (au lieu de 2880x1620)
+// ce qui réduit massivement le poids tout en gardant une excellente qualité.
+const QUALITY_CRF = { high: 18, standard: 23, light: 28 };
+
 // Render asynchrone (NE JAMAIS bloquer la boucle d'événements Node : le serveur
 // sert aussi le frontend). Timeout pour éviter tout gel permanent si Chromium
 // ne se lance pas.
-export function renderVideo({ componentName, slug, projectRoot, onLog, timeoutMs = 12 * 60 * 1000 }) {
+export function renderVideo({ componentName, slug, projectRoot, quality = 'high', onLog, timeoutMs = 12 * 60 * 1000 }) {
   return new Promise((resolve, reject) => {
     const output = path.join('data', 'videos', `${slug}.mp4`);
+    const crf = QUALITY_CRF[quality] || QUALITY_CRF.high;
     const args = [
       'remotion', 'render', 'src/Root.tsx', componentName, output,
       '--codec=h264',
-      '--crf=1',
+      `--crf=${crf}`,
       '--pixel-format=yuv420p',
       '--image-format=png',
-      '--scale=1.5',
       '--public-dir=data',
       '--log=error',
     ];
@@ -689,7 +819,7 @@ export function renderVideo({ componentName, slug, projectRoot, onLog, timeoutMs
  * @param {string} params.projectRoot   Racine du projet ClearDoc (__dirname du server)
  * @returns {Promise<{ videoUrl: string, slug: string }>}
  */
-export async function generateVideoForDocument({ doc, getSetting, send, projectRoot, theme, accentColor }) {
+export async function generateVideoForDocument({ doc, getSetting, send, projectRoot, theme, accentColor, quality }) {
   const videosCodeDir = path.join(projectRoot, 'src', 'videos');
   const rootPath = path.join(projectRoot, 'src', 'Root.tsx');
   const audioDir = path.join(projectRoot, 'data', 'audio');
@@ -698,6 +828,7 @@ export async function generateVideoForDocument({ doc, getSetting, send, projectR
   const themeId = theme || getSetting('VIDEO_THEME') || 'cleardoc';
   const accent = accentColor || getSetting('VIDEO_ACCENT_COLOR') || null;
   const resolvedTheme = resolveTheme(themeId, accent);
+  const videoQuality = quality || getSetting('VIDEO_QUALITY') || 'high';
 
   // Watermark : présence du fichier + position/taille en base
   const watermark = {
@@ -747,7 +878,7 @@ export async function generateVideoForDocument({ doc, getSetting, send, projectR
 
   // Étape 4 — Render (asynchrone, ne bloque pas la boucle d'événements)
   send('render', 'Render vidéo en cours (~2-3 min)...', 75);
-  await renderVideo({ componentName, slug, projectRoot });
+  await renderVideo({ componentName, slug, projectRoot, quality: videoQuality });
   send('render', 'Vidéo rendue', 90);
 
   const videoUrl = `/data/videos/${slug}.mp4`;
