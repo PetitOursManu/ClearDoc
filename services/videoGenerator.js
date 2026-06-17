@@ -103,6 +103,25 @@ export function toPascalCase(slug) {
 }
 
 // ============================================
+// ICÔNES (lucide-react, déjà installé) — jeu cohérent pour les scènes
+// ============================================
+
+const ALLOWED_ICONS = [
+  'wallet', 'coins', 'banknote', 'receipt', 'percent', 'calculator', 'calendar', 'building',
+  'briefcase', 'file', 'piggy-bank', 'trending-up', 'trending-down', 'shield', 'info', 'check',
+  'hand-coins', 'user', 'clock', 'scale', 'chart',
+];
+
+// Mappe chaque mot-clé vers le composant lucide-react correspondant.
+const LUCIDE_BY_ICON = {
+  wallet: 'Wallet', coins: 'Coins', banknote: 'Banknote', receipt: 'Receipt', percent: 'Percent',
+  calculator: 'Calculator', calendar: 'Calendar', building: 'Building2', briefcase: 'Briefcase',
+  file: 'FileText', 'piggy-bank': 'PiggyBank', 'trending-up': 'TrendingUp', 'trending-down': 'TrendingDown',
+  shield: 'ShieldCheck', info: 'Info', check: 'CheckCircle2', 'hand-coins': 'HandCoins', user: 'User',
+  clock: 'Clock', scale: 'Scale', chart: 'BarChart3',
+};
+
+// ============================================
 // ÉTAPE 1 — GÉNÉRATION DES SCÈNES (IA compatible OpenAI)
 // ============================================
 
@@ -126,6 +145,14 @@ RÈGLES ABSOLUES :
 - Préciser que les chiffres sont des exemples
 - Texte en français
 
+Pour CHAQUE scène, fournis :
+- "titre" : un titre court (3 à 5 mots)
+- "voix" : le texte COMPLET de la voix-off (2 à 4 phrases) — c'est ce qui sera lu à voix haute
+- "ecran" : une version TRÈS COURTE affichée à l'écran (8 mots maximum, l'idée clé seulement, surtout PAS le texte complet de la voix)
+- "icone" : un seul mot-clé choisi STRICTEMENT dans cette liste : ${ALLOWED_ICONS.join(', ')} (choisis l'icône la plus pertinente pour la scène)
+- "chiffre" : SI la scène met en avant un nombre clé (montant, taux, durée...), donne-le comme nombre avec un point décimal (ex: 512.31 ou 0). Sinon null. (les chiffres sont des exemples)
+- "suffixe" : l'unité du chiffre ("€", "%", "h"...) ou "" si aucun / si chiffre est null
+
 INTERDICTIONS STRICTES — ne jamais inclure :
 - Messages politiques, patriotiques ou civiques
 - "contribuer à la vie du pays", "pilier de la société", "fier de travailler pour la France"
@@ -135,7 +162,7 @@ INTERDICTIONS STRICTES — ne jamais inclure :
 - Rester strictement factuel sur le contenu de la fiche de paie
 
 Répondre UNIQUEMENT en JSON valide sans markdown :
-{"scenes":[{"id":"scene1","titre":"Titre court","voix":"Texte voix-off."}]}`;
+{"scenes":[{"id":"scene1","titre":"Titre court","voix":"Texte voix-off complet.","ecran":"Idée clé courte","icone":"wallet","chiffre":512.31,"suffixe":"€"}]}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -174,11 +201,26 @@ Répondre UNIQUEMENT en JSON valide sans markdown :
     throw new Error('Aucune scène générée par l\'IA');
   }
 
-  return scenes.map((s, i) => ({
-    id: slugify(s.id || `scene${i + 1}`),
-    titre: String(s.titre || `Scène ${i + 1}`),
-    voix: String(s.voix || '').trim(),
-  })).filter(s => s.voix.length > 0);
+  return scenes.map((s, i) => {
+    const voix = String(s.voix || '').trim();
+    let ecran = String(s.ecran || '').trim();
+    // Repli : si l'IA n'a pas fourni de texte court, prendre le titre ou la 1re phrase tronquée
+    if (!ecran) ecran = String(s.titre || voix).split(/[.!?\n]/)[0].trim().slice(0, 70);
+    const icone = ALLOWED_ICONS.includes(String(s.icone)) ? String(s.icone) : 'info';
+    const chiffre = (typeof s.chiffre === 'number' && Number.isFinite(s.chiffre)) ? s.chiffre : null;
+    const suffixe = chiffre !== null ? String(s.suffixe || '') : '';
+    const decimals = chiffre !== null && !Number.isInteger(chiffre) ? 2 : 0;
+    return {
+      id: slugify(s.id || `scene${i + 1}`),
+      titre: String(s.titre || `Scène ${i + 1}`),
+      voix,
+      ecran,
+      icone,
+      chiffre,
+      suffixe,
+      decimals,
+    };
+  }).filter(s => s.voix.length > 0);
 }
 
 // ============================================
@@ -243,12 +285,32 @@ export function generateTSX({ titre, scenes, slug, videosDir, theme, watermark }
   const watermarkStyle = resolveWatermarkStyle(watermark);
 
   // Pré-calcul des offsets de chaque scène pour éviter une accumulation mutable dans le rendu.
+  // Le texte complet (voix) n'est PLUS affiché : seule la phrase courte "ecran" + une icône.
   let acc = 0;
-  const scenesData = scenes.map(s => {
-    const item = { id: s.id, titre: s.titre, voix: s.voix, frames: s.frames, from: acc, file: s.filename };
+  const scenesData = scenes.map((s, i) => {
+    const item = {
+      id: s.id,
+      titre: s.titre,
+      ecran: s.ecran || s.titre || '',
+      icone: s.icone || 'info',
+      chiffre: (typeof s.chiffre === 'number' && Number.isFinite(s.chiffre)) ? s.chiffre : null,
+      suffixe: s.suffixe || '',
+      decimals: (typeof s.decimals === 'number') ? s.decimals : 0,
+      index: i,
+      frames: s.frames,
+      from: acc,
+      file: s.filename,
+    };
     acc += s.frames;
     return item;
   });
+
+  // Import lucide-react + table des icônes utilisables
+  const uniqueLucide = [...new Set(Object.values(LUCIDE_BY_ICON))];
+  const lucideImport = `import { ${uniqueLucide.join(', ')} } from 'lucide-react';`;
+  const iconsMapEntries = Object.entries(LUCIDE_BY_ICON)
+    .map(([k, v]) => `  ${JSON.stringify(k)}: ${v},`)
+    .join('\n');
 
   // Les textes issus de l'IA et les couleurs du thème sont injectés via JSON.stringify :
   // aucune interpolation directe de chaîne dans le code généré (sécurité + robustesse).
@@ -258,6 +320,11 @@ import {
   AbsoluteFill, Audio, Img, Sequence, staticFile,
   useCurrentFrame, useVideoConfig, interpolate, spring, Easing,
 } from 'remotion';
+${lucideImport}
+
+const ICONS: Record<string, React.FC<any>> = {
+${iconsMapEntries}
+};
 
 const SCENES = ${JSON.stringify(scenesData, null, 2)};
 const VIDEO_TITLE = ${JSON.stringify(titre)};
@@ -269,48 +336,150 @@ const WM_STYLE = ${JSON.stringify(watermarkStyle)};
 
 const clamp = { extrapolateLeft: 'clamp' as const, extrapolateRight: 'clamp' as const };
 
-const Scene: React.FC<{ titre: string; voix: string; file: string; sceneFrames: number }> = ({ titre, voix, file, sceneFrames }) => {
+const formatNumber = (value: number, decimals: number) =>
+  value.toLocaleString('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+// Fond animé continu : dégradé + grille de points + blobs flous qui dérivent
+const AnimatedBg: React.FC = () => {
+  const frame = useCurrentFrame();
+  const blobs = [
+    { x: 16, y: 22, r: 540, phase: 0, amp: 36 },
+    { x: 84, y: 74, r: 480, phase: 2.2, amp: 46 },
+    { x: 72, y: 14, r: 340, phase: 4.1, amp: 28 },
+  ];
+  return (
+    <AbsoluteFill style={{ background: THEME.background, overflow: 'hidden' }}>
+      <AbsoluteFill style={{ backgroundImage: \`radial-gradient(\${THEME.textSecondary}1f 1.6px, transparent 1.6px)\`, backgroundSize: '46px 46px', opacity: 0.4 }} />
+      {blobs.map((b, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            left: \`\${b.x}%\`,
+            top: \`\${b.y}%\`,
+            width: b.r,
+            height: b.r,
+            borderRadius: '50%',
+            background: ACCENT,
+            opacity: 0.13,
+            filter: 'blur(90px)',
+            transform: \`translate(-50%, -50%) translateY(\${Math.sin(frame / 42 + b.phase) * b.amp}px)\`,
+          }}
+        />
+      ))}
+    </AbsoluteFill>
+  );
+};
+
+const Scene: React.FC<{ scene: any; total: number }> = ({ scene, total }) => {
+  const { titre, ecran, icone, file, frames: sceneFrames, chiffre, suffixe, decimals, index } = scene;
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Transition d'entrée/sortie de la scène
-  const inOut = interpolate(frame, [0, 18, sceneFrames - 18, sceneFrames], [0, 1, 1, 0], clamp);
+  // Transition d'entrée/sortie de la scène (le fond animé reste, lui, continu)
+  const inOut = interpolate(frame, [0, 16, sceneFrames - 16, sceneFrames], [0, 1, 1, 0], clamp);
   const slideX = THEME.transition === 'slide'
-    ? interpolate(frame, [0, 20], [60, 0], { ...clamp, easing: Easing.out(Easing.cubic) })
+    ? interpolate(frame, [0, 20], [70, 0], { ...clamp, easing: Easing.out(Easing.cubic) })
     : 0;
 
-  // Animations internes
-  const badgeOpacity = interpolate(frame, [5, 20], [0, 1], clamp);
-  const badgeY = interpolate(frame, [5, 20], [16, 0], clamp);
-  const cardSpring = spring({ frame: frame - 12, fps, config: { damping: 16, stiffness: 110 } });
-  const cardY = interpolate(cardSpring, [0, 1], [50, 0]);
-  const textOpacity = interpolate(frame, [22, 42], [0, 1], clamp);
+  // Icône : apparition en spring (léger rebond) + flottement continu
+  const iconSpring = spring({ frame: frame - 4, fps, config: { damping: 11, stiffness: 130, mass: 0.7 } });
+  const iconScale = interpolate(iconSpring, [0, 1], [0.4, 1]);
+  const iconOpacity = interpolate(frame, [2, 16], [0, 1], clamp);
+  const float = Math.sin(frame / 16) * 7;
+
+  // Badge
+  const badgeOpacity = interpolate(frame, [12, 26], [0, 1], clamp);
+  const badgeY = interpolate(frame, [12, 26], [16, 0], clamp);
+
+  // Compteur de montant (count-up)
+  const countSpring = spring({ frame: frame - 16, fps, config: { damping: 20, stiffness: 80 } });
+  const countValue = chiffre != null ? chiffre * Math.min(1, countSpring) : 0;
+  const numberOpacity = interpolate(frame, [16, 30], [0, 1], clamp);
+
+  const Icon = ICONS[icone] || ICONS.info;
+  const words = String(ecran).split(' ');
 
   return (
     <AbsoluteFill
       style={{
-        background: THEME.background,
         opacity: inOut,
         transform: \`translateX(\${slideX}px)\`,
-        padding: '56px 96px',
+        padding: '70px 120px',
         flexDirection: 'column',
         justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
       }}
     >
       <Audio src={staticFile(\`audio/\${file}\`)} />
 
+      {/* Points de progression des scènes */}
+      <div style={{ position: 'absolute', top: 64, display: 'flex', gap: 10 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              width: i === index ? 36 : 12,
+              height: 12,
+              borderRadius: 999,
+              background: i === index ? ACCENT : \`\${THEME.textSecondary}55\`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Icône + anneaux qui pulsent */}
+      <div style={{ position: 'relative', width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44, transform: \`translateY(\${float}px)\` }}>
+        {[0, 1].map((r) => {
+          const raw = ((frame - r * 18) % 72) / 72;
+          const t = raw < 0 ? raw + 1 : raw;
+          return (
+            <div
+              key={r}
+              style={{
+                position: 'absolute',
+                width: 260,
+                height: 260,
+                borderRadius: '50%',
+                border: \`2px solid \${ACCENT}\`,
+                opacity: (1 - t) * 0.35 * iconOpacity,
+                transform: \`scale(\${1 + t * 0.7})\`,
+              }}
+            />
+          );
+        })}
+        <div
+          style={{
+            width: 260,
+            height: 260,
+            borderRadius: '50%',
+            background: \`\${ACCENT}14\`,
+            border: \`3px solid \${ACCENT}33\`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: iconOpacity,
+            transform: \`scale(\${iconScale})\`,
+            boxShadow: \`0 16px 56px \${ACCENT}22\`,
+          }}
+        >
+          <Icon size={140} color={ACCENT} strokeWidth={1.75} />
+        </div>
+      </div>
+
       {/* Badge titre */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, opacity: badgeOpacity, transform: \`translateY(\${badgeY}px)\` }}>
-        <div style={{ width: 6, height: 34, background: ACCENT, borderRadius: 3 }} />
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 24, opacity: badgeOpacity, transform: \`translateY(\${badgeY}px)\` }}>
+        <div style={{ width: 6, height: 30, background: ACCENT, borderRadius: 3 }} />
         <div
           style={{
             background: THEME.badgeBg,
             color: THEME.badgeText,
             border: \`2px solid \${ACCENT}40\`,
-            fontSize: 24,
+            fontSize: 26,
             fontWeight: 700,
             fontFamily: 'Arial, sans-serif',
-            padding: '8px 24px',
+            padding: '8px 26px',
             borderRadius: 999,
           }}
         >
@@ -318,21 +487,37 @@ const Scene: React.FC<{ titre: string; voix: string; file: string; sceneFrames: 
         </div>
       </div>
 
-      {/* Card contenu */}
-      <div
-        style={{
-          background: THEME.surface,
-          border: \`2px solid \${THEME.surfaceBorder}\`,
-          borderRadius: 20,
-          padding: '40px 52px',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
-          transform: \`translateY(\${cardY}px)\`,
-          opacity: Math.min(1, cardSpring),
-        }}
-      >
-        <div style={{ fontSize: 36, color: THEME.textPrimary, fontFamily: 'Arial, sans-serif', lineHeight: 1.6, opacity: textOpacity }}>
-          {voix}
+      {/* Compteur de montant (si présent) */}
+      {chiffre != null && (
+        <div style={{ fontSize: 116, fontWeight: 900, color: ACCENT, fontFamily: 'Arial, sans-serif', lineHeight: 1, marginBottom: 18, opacity: numberOpacity }}>
+          {formatNumber(countValue, decimals)}{suffixe ? ' ' + suffixe : ''}
         </div>
+      )}
+
+      {/* Texte court — révélation mot par mot (le texte complet reste dans l'audio) */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0 16px', maxWidth: 1500 }}>
+        {words.map((w, i) => {
+          const start = 24 + i * 4;
+          const o = interpolate(frame, [start, start + 12], [0, 1], clamp);
+          const y = interpolate(frame, [start, start + 12], [20, 0], clamp);
+          return (
+            <span
+              key={i}
+              style={{
+                display: 'inline-block',
+                fontSize: chiffre != null ? 44 : 60,
+                fontWeight: 800,
+                color: THEME.textPrimary,
+                fontFamily: 'Arial, sans-serif',
+                lineHeight: 1.3,
+                opacity: o,
+                transform: \`translateY(\${y}px)\`,
+              }}
+            >
+              {w}
+            </span>
+          );
+        })}
       </div>
     </AbsoluteFill>
   );
@@ -343,9 +528,11 @@ export const ${componentName}: React.FC = () => {
   const globalProgress = Math.min(1, frame / TOTAL_FRAMES);
   return (
     <AbsoluteFill style={{ backgroundColor: THEME.bg }}>
+      <AnimatedBg />
+
       {SCENES.map((scene) => (
         <Sequence key={scene.id} from={scene.from} durationInFrames={scene.frames}>
-          <Scene titre={scene.titre} voix={scene.voix} file={scene.file} sceneFrames={scene.frames} />
+          <Scene scene={scene} total={SCENES.length} />
         </Sequence>
       ))}
 
