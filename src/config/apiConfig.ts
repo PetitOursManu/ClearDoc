@@ -238,6 +238,7 @@ export async function uploadImage(file: File): Promise<{ imageUrl: string }> {
   const response = await fetch(API_CONFIG.uploadUrl, {
     method: 'POST',
     body: formData,
+    credentials: 'include',
     signal: controller.signal
   });
 

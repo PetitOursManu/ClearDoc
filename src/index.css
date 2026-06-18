@@ -188,3 +188,33 @@ body {
   border-top: 1px solid hsl(var(--border));
   margin: 0.75rem 0;
 }
+
+/* ── Éléments enrichis (éditeur + affichage) ── */
+.rich-editor-content blockquote,
+.rich-content blockquote {
+  border-left: 3px solid hsl(var(--primary));
+  padding: 0.25rem 0 0.25rem 0.85rem;
+  margin: 0.5rem 0;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+.rich-editor-content s,
+.rich-content s {
+  text-decoration: line-through;
+}
+.rich-editor-content mark,
+.rich-content mark {
+  border-radius: 0.2rem;
+  padding: 0 0.15rem;
+}
+.rich-editor-content img,
+.rich-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.6rem;
+  margin: 0.5rem 0;
+  display: block;
+}
+.rich-editor-content img.ProseMirror-selectednode {
+  outline: 2px solid hsl(var(--primary));
+}

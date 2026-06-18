@@ -281,7 +281,7 @@ function App() {
         <div className="flex flex-col min-h-screen w-full max-w-[1400px] mx-auto">
           {headerContent}
           <main className="flex-1 w-full">
-            <PayslipDetail item={selectedItem} onBack={handleBack} />
+            <PayslipDetail item={selectedItem} onBack={handleBack} isAdmin={isAdmin} onEdit={handleEdit} />
           </main>
           <footer className="bg-white dark:bg-slate-900 border-t dark:border-slate-800 mt-20">
             <div className="px-4 py-8 max-w-7xl mx-auto text-center text-muted-foreground">
@@ -289,6 +289,16 @@ function App() {
             </div>
           </footer>
         </div>
+
+        <EditDialog
+          item={editingItem}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSave={handleSave}
+          onVideoDeleted={(id) =>
+            setPayslipItems(items => items.map(i => (i.id === id ? { ...i, videoUrl: '' } : i)))
+          }
+        />
       </div>
     );
   }
