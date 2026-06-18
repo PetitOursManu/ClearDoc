@@ -10,7 +10,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useReducer } from 'react';
 import {
   Bold,
   Italic,
@@ -86,6 +86,11 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [sourceMode, setSourceMode] = useState(false);
+  // Force le re-render de la barre d'outils sur les changements de sélection
+  // (sinon les états actif/désactivé — ex. boutons de tableau — restent figés).
+  const [, forceToolbarUpdate] = useReducer((x: number) => x + 1, 0);
+  // Dernier HTML émis par l'éditeur lui-même (pour ne pas le re-synchroniser).
+  const lastEmitted = useRef<string | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -124,16 +129,25 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
       },
     },
     onUpdate({ editor: ed }) {
-      onChange(ed.getHTML());
+      const html = ed.getHTML();
+      lastEmitted.current = html;
+      onChange(html);
+    },
+    onSelectionUpdate() {
+      forceToolbarUpdate();
     },
   });
 
-  // Only sync when content changes externally (e.g. opening EditDialog with different item).
-  // Skip if the editor itself produced this HTML (avoids cursor reset on every keystroke).
+  // Synchronise uniquement les changements EXTERNES (ex. ouverture d'une autre fiche).
+  // On ignore le HTML produit par l'éditeur lui-même et on ne touche jamais au
+  // contenu pendant que l'utilisateur édite (focus) — sinon la sélection (double-clic,
+  // etc.) est perturbée.
   useEffect(() => {
     if (!editor) return;
+    if (content === lastEmitted.current) return;
+    if (editor.isFocused) return;
     if (content !== editor.getHTML()) {
-      editor.commands.setContent(content || '');
+      editor.commands.setContent(content || '', { emitUpdate: false });
     }
   }, [content, editor]);
 
