@@ -49,26 +49,32 @@ const EMOJI_GROUPS: { label: string; items: string[] }[] = [
   { label: 'Formes', items: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🔶', '🔷', '🟥', '🟦', '🟩', '★', '●', '■', '▲', '◆'] },
 ];
 
-// Attribut "couleur de fond" ajouté aux cellules, persisté en style inline
-// (donc conservé à l'enregistrement et rendu sur la fiche publique).
-const cellBackgroundAttribute = {
+// Attributs ajoutés aux cellules (couleur de fond + alignement horizontal),
+// persistés en style inline -> conservés à l'enregistrement et rendus sur la fiche.
+const cellAttributes = {
   backgroundColor: {
     default: null as string | null,
     parseHTML: (element: HTMLElement) => element.style.backgroundColor || null,
     renderHTML: (attributes: { backgroundColor?: string | null }) =>
       attributes.backgroundColor ? { style: `background-color: ${attributes.backgroundColor}` } : {},
   },
+  textAlign: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => element.style.textAlign || null,
+    renderHTML: (attributes: { textAlign?: string | null }) =>
+      attributes.textAlign ? { style: `text-align: ${attributes.textAlign}` } : {},
+  },
 };
 
 const TableCellColored = TableCell.extend({
   addAttributes() {
-    return { ...this.parent?.(), ...cellBackgroundAttribute };
+    return { ...this.parent?.(), ...cellAttributes };
   },
 });
 
 const TableHeaderColored = TableHeader.extend({
   addAttributes() {
-    return { ...this.parent?.(), ...cellBackgroundAttribute };
+    return { ...this.parent?.(), ...cellAttributes };
   },
 });
 
@@ -204,6 +210,11 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
   const currentColor: string =
     (editor.getAttributes('textStyle').color as string) || '';
+
+  // Alignement de la cellule courante (attribut de cellule, pas du paragraphe)
+  const cellType = editor.isActive('tableHeader') ? 'tableHeader' : 'tableCell';
+  const cellTextAlign: string | null =
+    (editor.isActive('table') ? (editor.getAttributes(cellType).textAlign as string | null) : null) || null;
 
   return (
     <div className="border border-input rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0 bg-background">
@@ -357,27 +368,27 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
               −Lig
             </ToolBtn>
 
-            {/* Alignement horizontal du texte dans la cellule */}
+            {/* Alignement horizontal du contenu de la cellule (attribut de cellule) */}
             <ToolBtn
               disabled={!editor.isActive('table')}
-              active={editor.isActive('table') && editor.isActive({ textAlign: 'left' })}
-              onClick={() => editor.chain().focus().setTextAlign('left').run()}
+              active={cellTextAlign === 'left'}
+              onClick={() => editor.chain().focus().setCellAttribute('textAlign', 'left').run()}
               title="Cellule : aligner à gauche"
             >
               <AlignLeft className="h-3.5 w-3.5" />
             </ToolBtn>
             <ToolBtn
               disabled={!editor.isActive('table')}
-              active={editor.isActive('table') && editor.isActive({ textAlign: 'center' })}
-              onClick={() => editor.chain().focus().setTextAlign('center').run()}
+              active={cellTextAlign === 'center'}
+              onClick={() => editor.chain().focus().setCellAttribute('textAlign', 'center').run()}
               title="Cellule : centrer"
             >
               <AlignCenter className="h-3.5 w-3.5" />
             </ToolBtn>
             <ToolBtn
               disabled={!editor.isActive('table')}
-              active={editor.isActive('table') && editor.isActive({ textAlign: 'right' })}
-              onClick={() => editor.chain().focus().setTextAlign('right').run()}
+              active={cellTextAlign === 'right'}
+              onClick={() => editor.chain().focus().setCellAttribute('textAlign', 'right').run()}
               title="Cellule : aligner à droite"
             >
               <AlignRight className="h-3.5 w-3.5" />
