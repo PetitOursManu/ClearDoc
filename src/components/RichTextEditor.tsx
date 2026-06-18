@@ -35,6 +35,7 @@ import {
   Loader2,
   Table as TableIcon,
   Code,
+  PaintBucket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { uploadImage } from '@/config/apiConfig';
@@ -48,6 +49,29 @@ const EMOJI_GROUPS: { label: string; items: string[] }[] = [
   { label: 'Formes', items: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🔶', '🔷', '🟥', '🟦', '🟩', '★', '●', '■', '▲', '◆'] },
 ];
 
+// Attribut "couleur de fond" ajouté aux cellules, persisté en style inline
+// (donc conservé à l'enregistrement et rendu sur la fiche publique).
+const cellBackgroundAttribute = {
+  backgroundColor: {
+    default: null as string | null,
+    parseHTML: (element: HTMLElement) => element.style.backgroundColor || null,
+    renderHTML: (attributes: { backgroundColor?: string | null }) =>
+      attributes.backgroundColor ? { style: `background-color: ${attributes.backgroundColor}` } : {},
+  },
+};
+
+const TableCellColored = TableCell.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...cellBackgroundAttribute };
+  },
+});
+
+const TableHeaderColored = TableHeader.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...cellBackgroundAttribute };
+  },
+});
+
 interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
@@ -58,6 +82,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   const colorInputRef = useRef<HTMLInputElement>(null);
   const highlightInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const cellColorInputRef = useRef<HTMLInputElement>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [sourceMode, setSourceMode] = useState(false);
@@ -86,8 +111,8 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
       TiptapImage.configure({ inline: false, allowBase64: false }),
       Table.configure({ resizable: true }),
       TableRow,
-      TableHeader,
-      TableCell,
+      TableHeaderColored,
+      TableCellColored,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -313,6 +338,28 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                 <ToolBtn onClick={() => editor.chain().focus().deleteRow().run()} title="Supprimer la ligne" className="w-auto px-1.5 text-[10px] font-semibold">
                   −Lig
                 </ToolBtn>
+
+                {/* Couleur de fond de la / des case(s) sélectionnée(s) */}
+                <div className="relative">
+                  <ToolBtn onClick={() => cellColorInputRef.current?.click()} title="Couleur de la case">
+                    <PaintBucket className="h-3.5 w-3.5" />
+                  </ToolBtn>
+                  <input
+                    ref={cellColorInputRef}
+                    type="color"
+                    className="sr-only"
+                    defaultValue="#fde68a"
+                    onInput={(e) => editor.chain().focus().setCellAttribute('backgroundColor', (e.target as HTMLInputElement).value).run()}
+                  />
+                </div>
+                <ToolBtn
+                  onClick={() => editor.chain().focus().setCellAttribute('backgroundColor', null).run()}
+                  title="Retirer la couleur de la case"
+                  className="w-auto px-1.5 text-[10px] font-semibold"
+                >
+                  ∅
+                </ToolBtn>
+
                 <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="Supprimer le tableau" className="w-auto px-1.5 text-[10px] font-semibold text-red-500">
                   ✕
                 </ToolBtn>
