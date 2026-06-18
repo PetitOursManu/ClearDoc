@@ -213,8 +213,24 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
   // Alignement de la cellule courante (attribut de cellule, pas du paragraphe)
   const cellType = editor.isActive('tableHeader') ? 'tableHeader' : 'tableCell';
+  const inTable = editor.isActive('table');
   const cellTextAlign: string | null =
-    (editor.isActive('table') ? (editor.getAttributes(cellType).textAlign as string | null) : null) || null;
+    (inTable ? (editor.getAttributes(cellType).textAlign as string | null) : null) || null;
+
+  // Un seul jeu de boutons d'alignement : aligne la cellule dans un tableau,
+  // le paragraphe sinon. Dans un tableau on aligne à la fois la cellule (td/th)
+  // et son paragraphe pour un rendu garanti.
+  const applyAlign = (a: 'left' | 'center' | 'right' | 'justify') => {
+    if (inTable) {
+      editor.chain().focus().setCellAttribute('textAlign', a).setTextAlign(a).run();
+    } else {
+      editor.chain().focus().setTextAlign(a).run();
+    }
+  };
+  const isAlignActive = (a: string) =>
+    inTable
+      ? cellTextAlign === a || (a === 'left' && !cellTextAlign)
+      : editor.isActive({ textAlign: a });
 
   return (
     <div className="border border-input rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-0 bg-background">
@@ -311,17 +327,17 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
             <Separator />
 
-            {/* Alignment */}
-            <ToolBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Aligner à gauche">
+            {/* Alignment (cellule dans un tableau, sinon paragraphe) */}
+            <ToolBtn active={isAlignActive('left')} onClick={() => applyAlign('left')} title="Aligner à gauche">
               <AlignLeft className="h-3.5 w-3.5" />
             </ToolBtn>
-            <ToolBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Centrer">
+            <ToolBtn active={isAlignActive('center')} onClick={() => applyAlign('center')} title="Centrer">
               <AlignCenter className="h-3.5 w-3.5" />
             </ToolBtn>
-            <ToolBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Aligner à droite">
+            <ToolBtn active={isAlignActive('right')} onClick={() => applyAlign('right')} title="Aligner à droite">
               <AlignRight className="h-3.5 w-3.5" />
             </ToolBtn>
-            <ToolBtn active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()} title="Justifier">
+            <ToolBtn active={isAlignActive('justify')} onClick={() => applyAlign('justify')} title="Justifier">
               <AlignJustify className="h-3.5 w-3.5" />
             </ToolBtn>
 
@@ -366,32 +382,6 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
             </ToolBtn>
             <ToolBtn disabled={!editor.isActive('table')} onClick={() => editor.chain().focus().deleteRow().run()} title="Supprimer la ligne" className="w-auto px-1.5 text-[10px] font-semibold">
               −Lig
-            </ToolBtn>
-
-            {/* Alignement horizontal du contenu de la cellule (attribut de cellule) */}
-            <ToolBtn
-              disabled={!editor.isActive('table')}
-              active={cellTextAlign === 'left'}
-              onClick={() => editor.chain().focus().setCellAttribute('textAlign', 'left').run()}
-              title="Cellule : aligner à gauche"
-            >
-              <AlignLeft className="h-3.5 w-3.5" />
-            </ToolBtn>
-            <ToolBtn
-              disabled={!editor.isActive('table')}
-              active={cellTextAlign === 'center'}
-              onClick={() => editor.chain().focus().setCellAttribute('textAlign', 'center').run()}
-              title="Cellule : centrer"
-            >
-              <AlignCenter className="h-3.5 w-3.5" />
-            </ToolBtn>
-            <ToolBtn
-              disabled={!editor.isActive('table')}
-              active={cellTextAlign === 'right'}
-              onClick={() => editor.chain().focus().setCellAttribute('textAlign', 'right').run()}
-              title="Cellule : aligner à droite"
-            >
-              <AlignRight className="h-3.5 w-3.5" />
             </ToolBtn>
 
             {/* Couleur de fond de la / des case(s) sélectionnée(s) */}
