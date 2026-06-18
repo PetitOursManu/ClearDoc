@@ -6,6 +6,10 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Highlight } from '@tiptap/extension-highlight';
 import { Image as TiptapImage } from '@tiptap/extension-image';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
 import { useEffect, useRef, useState } from 'react';
 import {
   Bold,
@@ -29,9 +33,12 @@ import {
   ImagePlus,
   Smile,
   Loader2,
+  Table as TableIcon,
+  Code,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { uploadImage } from '@/config/apiConfig';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 // Émojis, symboles et formes prêts à insérer
 const EMOJI_GROUPS: { label: string; items: string[] }[] = [
@@ -53,6 +60,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [sourceMode, setSourceMode] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -76,6 +84,10 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
       Color,
       Highlight.configure({ multicolor: true }),
       TiptapImage.configure({ inline: false, allowBase64: false }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -154,149 +166,188 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 border-b border-input bg-muted/40 px-1.5 py-1">
 
-        {/* Bold */}
-        <ToolBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Gras">
-          <Bold className="h-3.5 w-3.5" />
-        </ToolBtn>
+        {sourceMode ? (
+          <span className="px-1.5 text-xs font-medium text-muted-foreground">Code source HTML / CSS</span>
+        ) : (
+          <>
+            {/* Bold */}
+            <ToolBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Gras">
+              <Bold className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        {/* Italic */}
-        <ToolBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italique">
-          <Italic className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Italic */}
+            <ToolBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italique">
+              <Italic className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        {/* Underline */}
-        <ToolBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Souligné">
-          <UnderlineIcon className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Underline */}
+            <ToolBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Souligné">
+              <UnderlineIcon className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        {/* Strikethrough */}
-        <ToolBtn active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} title="Barré">
-          <Strikethrough className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Strikethrough */}
+            <ToolBtn active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} title="Barré">
+              <Strikethrough className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        <Separator />
+            <Separator />
 
-        {/* Color picker */}
-        <div className="relative">
-          <ToolBtn onClick={() => colorInputRef.current?.click()} title="Couleur du texte">
-            <div className="flex flex-col items-center gap-px">
-              <Palette className="h-3.5 w-3.5" />
-              <span className="h-0.5 w-3.5 rounded-full" style={{ backgroundColor: currentColor || 'currentColor' }} />
+            {/* Color picker */}
+            <div className="relative">
+              <ToolBtn onClick={() => colorInputRef.current?.click()} title="Couleur du texte">
+                <div className="flex flex-col items-center gap-px">
+                  <Palette className="h-3.5 w-3.5" />
+                  <span className="h-0.5 w-3.5 rounded-full" style={{ backgroundColor: currentColor || 'currentColor' }} />
+                </div>
+              </ToolBtn>
+              <input
+                ref={colorInputRef}
+                type="color"
+                className="sr-only"
+                defaultValue="#000000"
+                onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()}
+              />
             </div>
-          </ToolBtn>
-          <input
-            ref={colorInputRef}
-            type="color"
-            className="sr-only"
-            defaultValue="#000000"
-            onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()}
-          />
-        </div>
 
-        {/* Reset color */}
-        <ToolBtn onClick={() => editor.chain().focus().unsetColor().run()} title="Couleur par défaut" className="w-auto px-1.5 text-xs font-semibold">
-          A
-        </ToolBtn>
+            {/* Reset color */}
+            <ToolBtn onClick={() => editor.chain().focus().unsetColor().run()} title="Couleur par défaut" className="w-auto px-1.5 text-xs font-semibold">
+              A
+            </ToolBtn>
 
-        {/* Highlight */}
-        <div className="relative">
-          <ToolBtn
-            active={editor.isActive('highlight')}
-            onClick={() => {
-              if (editor.isActive('highlight')) {
-                editor.chain().focus().unsetHighlight().run();
-              } else {
-                highlightInputRef.current?.click();
-              }
-            }}
-            title="Surligner"
-          >
-            <Highlighter className="h-3.5 w-3.5" />
-          </ToolBtn>
-          <input
-            ref={highlightInputRef}
-            type="color"
-            className="sr-only"
-            defaultValue="#fde68a"
-            onInput={(e) => editor.chain().focus().setHighlight({ color: (e.target as HTMLInputElement).value }).run()}
-          />
-        </div>
+            {/* Highlight */}
+            <div className="relative">
+              <ToolBtn
+                active={editor.isActive('highlight')}
+                onClick={() => {
+                  if (editor.isActive('highlight')) {
+                    editor.chain().focus().unsetHighlight().run();
+                  } else {
+                    highlightInputRef.current?.click();
+                  }
+                }}
+                title="Surligner"
+              >
+                <Highlighter className="h-3.5 w-3.5" />
+              </ToolBtn>
+              <input
+                ref={highlightInputRef}
+                type="color"
+                className="sr-only"
+                defaultValue="#fde68a"
+                onInput={(e) => editor.chain().focus().setHighlight({ color: (e.target as HTMLInputElement).value }).run()}
+              />
+            </div>
 
-        <Separator />
+            <Separator />
 
-        {/* Headings */}
-        <ToolBtn active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Titre 1">
-          <Heading1 className="h-3.5 w-3.5" />
-        </ToolBtn>
-        <ToolBtn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Titre 2">
-          <Heading2 className="h-3.5 w-3.5" />
-        </ToolBtn>
-        <ToolBtn active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Titre 3">
-          <Heading3 className="h-3.5 w-3.5" />
-        </ToolBtn>
-        <ToolBtn active={editor.isActive('paragraph')} onClick={() => editor.chain().focus().setParagraph().run()} title="Paragraphe">
-          <Pilcrow className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Headings */}
+            <ToolBtn active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Titre 1">
+              <Heading1 className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Titre 2">
+              <Heading2 className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Titre 3">
+              <Heading3 className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn active={editor.isActive('paragraph')} onClick={() => editor.chain().focus().setParagraph().run()} title="Paragraphe">
+              <Pilcrow className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        <Separator />
+            <Separator />
 
-        {/* Alignment */}
-        <ToolBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Aligner à gauche">
-          <AlignLeft className="h-3.5 w-3.5" />
-        </ToolBtn>
-        <ToolBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Centrer">
-          <AlignCenter className="h-3.5 w-3.5" />
-        </ToolBtn>
-        <ToolBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Aligner à droite">
-          <AlignRight className="h-3.5 w-3.5" />
-        </ToolBtn>
-        <ToolBtn active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()} title="Justifier">
-          <AlignJustify className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Alignment */}
+            <ToolBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Aligner à gauche">
+              <AlignLeft className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Centrer">
+              <AlignCenter className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Aligner à droite">
+              <AlignRight className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()} title="Justifier">
+              <AlignJustify className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        <Separator />
+            <Separator />
 
-        {/* Lists */}
-        <ToolBtn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Liste à puces">
-          <List className="h-3.5 w-3.5" />
-        </ToolBtn>
-        <ToolBtn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Liste numérotée">
-          <ListOrdered className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Lists */}
+            <ToolBtn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Liste à puces">
+              <List className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Liste numérotée">
+              <ListOrdered className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        {/* Blockquote */}
-        <ToolBtn active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Citation">
-          <Quote className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Blockquote */}
+            <ToolBtn active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Citation">
+              <Quote className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        {/* Horizontal rule */}
-        <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Séparateur">
-          <Minus className="h-3.5 w-3.5" />
-        </ToolBtn>
+            {/* Horizontal rule */}
+            <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Séparateur">
+              <Minus className="h-3.5 w-3.5" />
+            </ToolBtn>
 
-        <Separator />
+            <Separator />
 
-        {/* Image upload (photos, schémas) */}
-        <ToolBtn onClick={() => imageInputRef.current?.click()} title="Insérer une image / un schéma">
-          {uploadingImg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
-        </ToolBtn>
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }}
-        />
+            {/* Table */}
+            <ToolBtn
+              onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+              title="Insérer un tableau (3×3)"
+            >
+              <TableIcon className="h-3.5 w-3.5" />
+            </ToolBtn>
+            {editor.isActive('table') && (
+              <>
+                <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title="Ajouter une colonne" className="w-auto px-1.5 text-[10px] font-semibold">
+                  +Col
+                </ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().addRowAfter().run()} title="Ajouter une ligne" className="w-auto px-1.5 text-[10px] font-semibold">
+                  +Lig
+                </ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().deleteColumn().run()} title="Supprimer la colonne" className="w-auto px-1.5 text-[10px] font-semibold">
+                  −Col
+                </ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().deleteRow().run()} title="Supprimer la ligne" className="w-auto px-1.5 text-[10px] font-semibold">
+                  −Lig
+                </ToolBtn>
+                <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="Supprimer le tableau" className="w-auto px-1.5 text-[10px] font-semibold text-red-500">
+                  ✕
+                </ToolBtn>
+              </>
+            )}
 
-        {/* Emoji / symbols / shapes */}
-        <div className="relative">
-          <ToolBtn active={emojiOpen} onClick={() => setEmojiOpen((o) => !o)} title="Émojis & formes">
-            <Smile className="h-3.5 w-3.5" />
-          </ToolBtn>
-          {emojiOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setEmojiOpen(false)} />
-              <div className="absolute z-50 mt-1 right-0 w-72 max-h-72 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-2">
+            <Separator />
+
+            {/* Image upload (photos, schémas) */}
+            <ToolBtn onClick={() => imageInputRef.current?.click()} title="Insérer une image / un schéma">
+              {uploadingImg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+            </ToolBtn>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }}
+            />
+
+            {/* Emoji / symbols / shapes (Popover portalisé : jamais rogné par le dialogue) */}
+            <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  title="Émojis & formes"
+                  className={cn(
+                    'inline-flex items-center justify-center rounded h-7 w-7 transition-colors',
+                    emojiOpen ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                  )}
+                >
+                  <Smile className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 max-h-72 overflow-y-auto p-2">
                 {EMOJI_GROUPS.map((group) => (
                   <div key={group.label} className="mb-2 last:mb-0">
                     <p className="text-[10px] font-semibold text-muted-foreground px-1 mb-1">{group.label}</p>
@@ -317,21 +368,42 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                     </div>
                   </div>
                 ))}
-              </div>
-            </>
-          )}
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
+
+        {/* Toggle source HTML/CSS — toujours visible */}
+        <div className="ml-auto">
+          <ToolBtn
+            active={sourceMode}
+            onClick={() => setSourceMode((s) => !s)}
+            title="Code source HTML / CSS"
+          >
+            <Code className="h-3.5 w-3.5" />
+          </ToolBtn>
         </div>
       </div>
 
       {/* Editor area */}
-      <div className="relative">
-        {placeholder && !editor.getText() && !editor.isActive('image') && (
-          <p className="absolute top-2 left-3 text-sm text-muted-foreground pointer-events-none select-none">
-            {placeholder}
-          </p>
-        )}
-        <EditorContent editor={editor} />
-      </div>
+      {sourceMode ? (
+        <textarea
+          value={content}
+          onChange={(e) => onChange(e.target.value)}
+          spellCheck={false}
+          placeholder="<p>Votre HTML/CSS ici…</p>"
+          className="w-full min-h-[200px] resize-y font-mono text-xs leading-relaxed p-3 bg-background outline-none"
+        />
+      ) : (
+        <div className="relative">
+          {placeholder && !editor.getText() && !editor.isActive('image') && !editor.isActive('table') && (
+            <p className="absolute top-2 left-3 text-sm text-muted-foreground pointer-events-none select-none">
+              {placeholder}
+            </p>
+          )}
+          <EditorContent editor={editor} />
+        </div>
+      )}
     </div>
   );
 }
