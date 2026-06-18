@@ -18,11 +18,17 @@ import {
   API_CONFIG, getData, getAdminSettings, saveAdminSettings,
   getRemotionStatus, uninstallRemotion, getGeneratedVideos, deleteVideo,
   publishVideo, discardVideo, streamSSE,
-  getWatermarkStatus, uploadWatermark, deleteWatermark,
+  getWatermarkStatus, uploadWatermark, deleteWatermark, getPendingVideo,
   type RemotionStatus, type GeneratedVideo,
 } from '@/config/apiConfig';
 import { PayslipItem } from '@/types/payslip';
-import { VIDEO_THEMES, DEFAULT_THEME, ACCENT_PRESETS, type VideoTheme } from '@/lib/videoThemes';
+import { VIDEO_THEMES, DEFAULT_THEME, ACCENT_PRESETS, resolveBgPreview, type VideoTheme, type BgConfig } from '@/lib/videoThemes';
+
+const BG_MODES: { value: string; label: string }[] = [
+  { value: 'theme', label: 'Fond du thème' },
+  { value: 'solid', label: 'Couleur unie' },
+  { value: 'gradient', label: 'Dégradé' },
+];
 
 const WM_POSITIONS: { value: string; label: string }[] = [
   { value: 'top-left', label: 'Haut gauche' },
@@ -34,6 +40,12 @@ const WM_SIZES: { value: string; label: string }[] = [
   { value: 'small', label: 'Petit' },
   { value: 'medium', label: 'Moyen' },
   { value: 'large', label: 'Grand' },
+];
+
+const QUALITY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'high', label: 'Haute (1080p, ~CRF 18)' },
+  { value: 'standard', label: 'Standard (1080p, plus léger)' },
+  { value: 'light', label: 'Légère (1080p, mini-poids)' },
 ];
 
 const WM_PREVIEW_CORNER: Record<string, string> = {
@@ -58,6 +70,7 @@ function ThemeCard({ theme, accent, selected, onClick }: {
     <button
       type="button"
       onClick={onClick}
+      title={theme.description}
       className={`rounded-lg overflow-hidden border-2 transition-all text-left ${
         selected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
       }`}
@@ -79,15 +92,16 @@ function ThemeCard({ theme, accent, selected, onClick }: {
   );
 }
 
-function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
-  theme: VideoTheme; accent: string; watermarkUrl?: string | null; watermarkPosition?: string;
+function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition, bg }: {
+  theme: VideoTheme; accent: string; watermarkUrl?: string | null; watermarkPosition?: string; bg: BgConfig;
 }) {
+  const preview = resolveBgPreview(theme, bg);
   return (
     <div className="rounded-lg overflow-hidden border border-border">
       <div className="text-xs text-muted-foreground px-3 py-1.5 border-b border-border bg-muted">
         Aperçu — thème {theme.name}
       </div>
-      <div className="relative p-6 flex flex-col items-center justify-center text-center" style={{ background: theme.bgGradient || theme.bg, minHeight: 170 }}>
+      <div className="relative p-6 flex flex-col items-center justify-center text-center" style={{ background: preview.background, minHeight: 170 }}>
         {watermarkUrl && (
           <img
             src={watermarkUrl}
@@ -95,12 +109,23 @@ function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
             className={`absolute ${WM_PREVIEW_CORNER[watermarkPosition || 'bottom-right']} h-6 w-auto object-contain pointer-events-none`}
           />
         )}
-        <div
-          className="rounded-full flex items-center justify-center mb-3"
-          style={{ width: 56, height: 56, background: `${accent}14`, border: `2px solid ${accent}33` }}
-        >
-          <Coins className="h-7 w-7" style={{ color: accent }} />
-        </div>
+        {theme.variant === 'minimal' ? (
+          <div className="mb-3"><Coins className="h-9 w-9" style={{ color: accent }} /></div>
+        ) : (
+          <div
+            className="flex items-center justify-center mb-3"
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: theme.variant === 'cyber' ? 10 : theme.variant === 'curvy' ? '42% 58% 56% 44% / 48% 42% 58% 52%' : '50%',
+              background: theme.variant === 'curvy' ? accent : `${accent}14`,
+              border: theme.variant === 'curvy' ? 'none' : `2px solid ${accent}33`,
+              boxShadow: theme.variant === 'cyber' ? `0 0 18px ${accent}66` : 'none',
+            }}
+          >
+            <Coins className="h-7 w-7" style={{ color: theme.variant === 'curvy' ? '#ffffff' : accent }} />
+          </div>
+        )}
         <div className="flex items-center gap-1.5 mb-2">
           <div className="w-1 h-4 rounded" style={{ background: accent }} />
           <span
@@ -110,7 +135,7 @@ function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition }: {
             TITRE DE LA SCÈNE
           </span>
         </div>
-        <p className="text-sm font-extrabold" style={{ color: theme.textPrimary }}>
+        <p className="text-sm font-extrabold" style={{ color: preview.textPrimary }}>
           Une idée clé courte
         </p>
         <div className="absolute bottom-0 left-0 h-0.5 rounded" style={{ width: '33%', background: accent }} />
@@ -149,6 +174,12 @@ export function VideoGenerator() {
   const [wmSize, setWmSize] = useState<string>('medium');
   const [uploadingWatermark, setUploadingWatermark] = useState(false);
   const wmFileRef = useRef<HTMLInputElement>(null);
+  const [quality, setQuality] = useState<string>('high');
+  // Fond personnalisé
+  const [bgMode, setBgMode] = useState<string>('theme');
+  const [bgColor1, setBgColor1] = useState<string>('#0f172a');
+  const [bgColor2, setBgColor2] = useState<string>('#1e293b');
+  const [bgAngle, setBgAngle] = useState<number>(135);
 
   // --- Section génération ---
   const [documents, setDocuments] = useState<PayslipItem[]>([]);
@@ -158,6 +189,7 @@ export function VideoGenerator() {
   const [progressMsg, setProgressMsg] = useState('');
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
   const [videoBust, setVideoBust] = useState(0);
+  const [isPending, setIsPending] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [videos, setVideos] = useState<GeneratedVideo[]>([]);
@@ -170,8 +202,9 @@ export function VideoGenerator() {
       getData().catch(() => ({ items: [] as PayslipItem[] })),
       getGeneratedVideos().catch(() => ({ videos: [] as GeneratedVideo[] })),
       getWatermarkStatus().catch(() => ({ exists: false, url: null, position: 'bottom-right', size: 'medium' })),
+      getPendingVideo().catch(() => ({ pending: null })),
     ])
-      .then(([settingsData, remotionData, docsData, videosData, watermarkData]) => {
+      .then(([settingsData, remotionData, docsData, videosData, watermarkData, pendingData]) => {
         const vals: Record<string, string> = {};
         const env: Record<string, boolean> = {};
         for (const f of SETTINGS_FIELDS) {
@@ -186,6 +219,17 @@ export function VideoGenerator() {
         const accentVal = settingsData['VIDEO_ACCENT_COLOR'];
         if (typeof themeVal === 'string' && VIDEO_THEMES[themeVal]) setSelectedTheme(themeVal);
         if (typeof accentVal === 'string' && accentVal) setAccentColor(accentVal);
+        const qualityVal = settingsData['VIDEO_QUALITY'];
+        if (typeof qualityVal === 'string' && qualityVal) setQuality(qualityVal);
+        // Fond personnalisé
+        const bgModeVal = settingsData['VIDEO_BG_MODE'];
+        const bgC1 = settingsData['VIDEO_BG_COLOR1'];
+        const bgC2 = settingsData['VIDEO_BG_COLOR2'];
+        const bgAng = settingsData['VIDEO_BG_ANGLE'];
+        if (typeof bgModeVal === 'string' && bgModeVal) setBgMode(bgModeVal);
+        if (typeof bgC1 === 'string' && bgC1) setBgColor1(bgC1);
+        if (typeof bgC2 === 'string' && bgC2) setBgColor2(bgC2);
+        if (typeof bgAng === 'string' && bgAng && Number.isFinite(+bgAng)) setBgAngle(+bgAng);
         // Watermark
         setWatermark({ exists: watermarkData.exists, url: watermarkData.url });
         if (watermarkData.position) setWmPosition(watermarkData.position);
@@ -193,6 +237,14 @@ export function VideoGenerator() {
         setRemotion(remotionData);
         setDocuments((docsData.items ?? []) as PayslipItem[]);
         setVideos((videosData.videos ?? []) as GeneratedVideo[]);
+        // Dernière vidéo non validée : on la repropose pour validation
+        const pending = pendingData.pending;
+        if (pending) {
+          setSelectedDoc(pending.documentId);
+          setResultVideoUrl(pending.videoUrl);
+          setVideoBust(Date.now());
+          setIsPending(true);
+        }
       })
       .finally(() => setLoading(false));
   }, [isAdmin, navigate]);
@@ -273,6 +325,11 @@ export function VideoGenerator() {
         VIDEO_ACCENT_COLOR: accentColor,
         VIDEO_WATERMARK_POSITION: wmPosition,
         VIDEO_WATERMARK_SIZE: wmSize,
+        VIDEO_QUALITY: quality,
+        VIDEO_BG_MODE: bgMode,
+        VIDEO_BG_COLOR1: bgColor1,
+        VIDEO_BG_COLOR2: bgColor2,
+        VIDEO_BG_ANGLE: String(bgAngle),
       });
       setAppearanceSaved(true);
     } catch (err) {
@@ -314,6 +371,7 @@ export function VideoGenerator() {
     setProgressMsg('Initialisation...');
     setResultVideoUrl(null);
     setPublished(false);
+    setIsPending(false);
     setError(null);
     try {
       await streamSSE(`${API_CONFIG.adminVideosUrl}/generate/${selectedDoc}`, (data) => {
@@ -325,7 +383,7 @@ export function VideoGenerator() {
           setVideoBust(Date.now());
           setProgress(100);
         }
-      }, { body: JSON.stringify({ theme: selectedTheme, accentColor }) });
+      }, { body: JSON.stringify({ theme: selectedTheme, accentColor, quality, bg: { mode: bgMode, color1: bgColor1, color2: bgColor2, angle: bgAngle } }) });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération');
     } finally {
@@ -340,6 +398,7 @@ export function VideoGenerator() {
     try {
       await publishVideo(selectedDoc, resultVideoUrl);
       setPublished(true);
+      setIsPending(false);
       const refreshed = await getGeneratedVideos();
       setVideos(refreshed.videos ?? []);
     } catch (err) {
@@ -358,6 +417,7 @@ export function VideoGenerator() {
     }
     setResultVideoUrl(null);
     setPublished(false);
+    setIsPending(false);
     setProgress(0);
     setProgressMsg('');
   };
@@ -578,6 +638,80 @@ export function VideoGenerator() {
               </div>
             </div>
 
+            {/* Fond personnalisé */}
+            <div className="mb-6">
+              <Label className="text-sm mb-3 block">Fond</Label>
+              <Select value={bgMode} onValueChange={(v) => { setBgMode(v); setAppearanceSaved(false); }}>
+                <SelectTrigger className="sm:w-72"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {BG_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              {bgMode === 'solid' && (
+                <div className="flex items-center gap-3 mt-3">
+                  <input
+                    type="color"
+                    value={bgColor1}
+                    onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                    className="w-10 h-10 rounded cursor-pointer border border-border bg-transparent"
+                  />
+                  <Input
+                    value={bgColor1}
+                    onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                    placeholder="#0f172a"
+                    className="w-32 font-mono text-sm"
+                  />
+                </div>
+              )}
+
+              {bgMode === 'gradient' && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center gap-5 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-10">Début</span>
+                      <input
+                        type="color"
+                        value={bgColor1}
+                        onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                        className="w-10 h-10 rounded cursor-pointer border border-border bg-transparent"
+                      />
+                      <Input
+                        value={bgColor1}
+                        onChange={(e) => { setBgColor1(e.target.value); setAppearanceSaved(false); }}
+                        className="w-28 font-mono text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-10">Fin</span>
+                      <input
+                        type="color"
+                        value={bgColor2}
+                        onChange={(e) => { setBgColor2(e.target.value); setAppearanceSaved(false); }}
+                        className="w-10 h-10 rounded cursor-pointer border border-border bg-transparent"
+                      />
+                      <Input
+                        value={bgColor2}
+                        onChange={(e) => { setBgColor2(e.target.value); setAppearanceSaved(false); }}
+                        className="w-28 font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-20">Angle {bgAngle}°</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={360}
+                      value={bgAngle}
+                      onChange={(e) => { setBgAngle(+e.target.value); setAppearanceSaved(false); }}
+                      className="flex-1 max-w-xs accent-primary"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Watermark / Logo */}
             <div className="mb-6">
               <Label className="text-sm mb-3 flex items-center gap-2">
@@ -633,6 +767,20 @@ export function VideoGenerator() {
               </div>
             </div>
 
+            {/* Qualité / poids de la vidéo */}
+            <div className="mb-6">
+              <Label className="text-sm mb-2 block">Qualité vidéo (poids du fichier)</Label>
+              <Select value={quality} onValueChange={(v) => { setQuality(v); setAppearanceSaved(false); }}>
+                <SelectTrigger className="sm:w-80"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {QUALITY_OPTIONS.map(q => <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Rendu en 1080p natif (au lieu de 2880×1620) → fichiers bien plus légers à qualité équivalente.
+              </p>
+            </div>
+
             {/* Aperçu */}
             <div className="mb-4">
               <ThemePreview
@@ -640,6 +788,7 @@ export function VideoGenerator() {
                 accent={accentColor}
                 watermarkUrl={watermark.exists ? watermark.url : null}
                 watermarkPosition={wmPosition}
+                bg={{ mode: bgMode as BgConfig['mode'], color1: bgColor1, color2: bgColor2, angle: bgAngle }}
               />
             </div>
 
@@ -700,6 +849,12 @@ export function VideoGenerator() {
 
             {resultVideoUrl && (
               <div className="mt-5 space-y-3">
+                {isPending && !published && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    Dernière vidéo générée mais non validée — vous pouvez la valider ou la rejeter.
+                  </div>
+                )}
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Aperçu — validez pour publier la vidéo sur la fiche (sous le titre, au-dessus de la description).
                 </p>

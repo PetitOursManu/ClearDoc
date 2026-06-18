@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Info } from 'lucide-react';
 import { PayslipItem } from '@/types/payslip';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -13,6 +14,7 @@ interface PayslipDetailProps {
 
 export function PayslipDetail({ item, onBack }: PayslipDetailProps) {
   const { language } = useLanguage();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Scroll to top when component mounts
@@ -56,6 +58,36 @@ export function PayslipDetail({ item, onBack }: PayslipDetailProps) {
 
         <CardContent>
           <div className="space-y-6">
+            {/* Mention légale affichée sur toutes les fiches, au-dessus de la vidéo */}
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-300">
+              <Info className="h-4 w-4 mt-0.5 shrink-0" />
+              <p className="leading-relaxed">
+                {language === 'fr' ? (
+                  <>
+                    Tous les chiffres présentés dans les vidéos et les descriptions sont donnés à
+                    titre d'exemple, d'après la fiche de paie type disponible dans la section{' '}
+                    <button
+                      onClick={() => navigate('/fiche-de-paie')}
+                      className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                    >
+                      Fiche de paie interactive
+                    </button>.
+                  </>
+                ) : (
+                  <>
+                    All figures shown in the videos and descriptions are provided as examples, based
+                    on the sample payslip available in the{' '}
+                    <button
+                      onClick={() => navigate('/fiche-de-paie')}
+                      className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                    >
+                      Interactive payslip
+                    </button>{' '}section.
+                  </>
+                )}
+              </p>
+            </div>
+
             {item.videoUrl && (
               <div className="rounded-xl overflow-hidden">
                 <video controls width="100%" className="rounded-xl w-full">
