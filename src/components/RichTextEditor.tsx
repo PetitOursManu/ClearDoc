@@ -158,20 +158,25 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
     title,
     children,
     className: extraClass,
+    disabled,
   }: {
     active?: boolean;
     onClick: () => void;
     title: string;
     children: React.ReactNode;
     className?: string;
+    disabled?: boolean;
   }) => (
     <button
       type="button"
       onClick={onClick}
       title={title}
+      disabled={disabled}
       className={cn(
         'inline-flex items-center justify-center rounded h-7 w-7 transition-colors',
-        active
+        disabled
+          ? 'opacity-40 cursor-not-allowed text-muted-foreground'
+          : active
           ? 'bg-foreground text-background'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
         extraClass,
@@ -317,54 +322,78 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
             <Separator />
 
-            {/* Table */}
+            {/* Table — contrôles toujours visibles (grisés hors d'un tableau) */}
             <ToolBtn
               onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
               title="Insérer un tableau (3×3)"
             >
               <TableIcon className="h-3.5 w-3.5" />
             </ToolBtn>
-            {editor.isActive('table') && (
-              <>
-                <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title="Ajouter une colonne" className="w-auto px-1.5 text-[10px] font-semibold">
-                  +Col
-                </ToolBtn>
-                <ToolBtn onClick={() => editor.chain().focus().addRowAfter().run()} title="Ajouter une ligne" className="w-auto px-1.5 text-[10px] font-semibold">
-                  +Lig
-                </ToolBtn>
-                <ToolBtn onClick={() => editor.chain().focus().deleteColumn().run()} title="Supprimer la colonne" className="w-auto px-1.5 text-[10px] font-semibold">
-                  −Col
-                </ToolBtn>
-                <ToolBtn onClick={() => editor.chain().focus().deleteRow().run()} title="Supprimer la ligne" className="w-auto px-1.5 text-[10px] font-semibold">
-                  −Lig
-                </ToolBtn>
 
-                {/* Couleur de fond de la / des case(s) sélectionnée(s) */}
-                <div className="relative">
-                  <ToolBtn onClick={() => cellColorInputRef.current?.click()} title="Couleur de la case">
-                    <PaintBucket className="h-3.5 w-3.5" />
-                  </ToolBtn>
-                  <input
-                    ref={cellColorInputRef}
-                    type="color"
-                    className="sr-only"
-                    defaultValue="#fde68a"
-                    onInput={(e) => editor.chain().focus().setCellAttribute('backgroundColor', (e.target as HTMLInputElement).value).run()}
-                  />
-                </div>
-                <ToolBtn
-                  onClick={() => editor.chain().focus().setCellAttribute('backgroundColor', null).run()}
-                  title="Retirer la couleur de la case"
-                  className="w-auto px-1.5 text-[10px] font-semibold"
-                >
-                  ∅
-                </ToolBtn>
+            <ToolBtn disabled={!editor.isActive('table')} onClick={() => editor.chain().focus().addColumnAfter().run()} title="Ajouter une colonne" className="w-auto px-1.5 text-[10px] font-semibold">
+              +Col
+            </ToolBtn>
+            <ToolBtn disabled={!editor.isActive('table')} onClick={() => editor.chain().focus().addRowAfter().run()} title="Ajouter une ligne" className="w-auto px-1.5 text-[10px] font-semibold">
+              +Lig
+            </ToolBtn>
+            <ToolBtn disabled={!editor.isActive('table')} onClick={() => editor.chain().focus().deleteColumn().run()} title="Supprimer la colonne" className="w-auto px-1.5 text-[10px] font-semibold">
+              −Col
+            </ToolBtn>
+            <ToolBtn disabled={!editor.isActive('table')} onClick={() => editor.chain().focus().deleteRow().run()} title="Supprimer la ligne" className="w-auto px-1.5 text-[10px] font-semibold">
+              −Lig
+            </ToolBtn>
 
-                <ToolBtn onClick={() => editor.chain().focus().deleteTable().run()} title="Supprimer le tableau" className="w-auto px-1.5 text-[10px] font-semibold text-red-500">
-                  ✕
-                </ToolBtn>
-              </>
-            )}
+            {/* Alignement horizontal du texte dans la cellule */}
+            <ToolBtn
+              disabled={!editor.isActive('table')}
+              active={editor.isActive('table') && editor.isActive({ textAlign: 'left' })}
+              onClick={() => editor.chain().focus().setTextAlign('left').run()}
+              title="Cellule : aligner à gauche"
+            >
+              <AlignLeft className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn
+              disabled={!editor.isActive('table')}
+              active={editor.isActive('table') && editor.isActive({ textAlign: 'center' })}
+              onClick={() => editor.chain().focus().setTextAlign('center').run()}
+              title="Cellule : centrer"
+            >
+              <AlignCenter className="h-3.5 w-3.5" />
+            </ToolBtn>
+            <ToolBtn
+              disabled={!editor.isActive('table')}
+              active={editor.isActive('table') && editor.isActive({ textAlign: 'right' })}
+              onClick={() => editor.chain().focus().setTextAlign('right').run()}
+              title="Cellule : aligner à droite"
+            >
+              <AlignRight className="h-3.5 w-3.5" />
+            </ToolBtn>
+
+            {/* Couleur de fond de la / des case(s) sélectionnée(s) */}
+            <div className="relative">
+              <ToolBtn disabled={!editor.isActive('table')} onClick={() => cellColorInputRef.current?.click()} title="Couleur de la case">
+                <PaintBucket className="h-3.5 w-3.5" />
+              </ToolBtn>
+              <input
+                ref={cellColorInputRef}
+                type="color"
+                className="sr-only"
+                defaultValue="#fde68a"
+                onInput={(e) => editor.chain().focus().setCellAttribute('backgroundColor', (e.target as HTMLInputElement).value).run()}
+              />
+            </div>
+            <ToolBtn
+              disabled={!editor.isActive('table')}
+              onClick={() => editor.chain().focus().setCellAttribute('backgroundColor', null).run()}
+              title="Retirer la couleur de la case"
+              className="w-auto px-1.5 text-[10px] font-semibold"
+            >
+              ∅
+            </ToolBtn>
+
+            <ToolBtn disabled={!editor.isActive('table')} onClick={() => editor.chain().focus().deleteTable().run()} title="Supprimer le tableau" className="w-auto px-1.5 text-[10px] font-semibold text-red-500">
+              ✕
+            </ToolBtn>
 
             <Separator />
 
