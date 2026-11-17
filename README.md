@@ -54,6 +54,8 @@ Optional settings:
 ```bash
 VITE_API_URL=           # Leave empty in production (same server)
 VITE_API_TIMEOUT=10000  # Request timeout in milliseconds
+APP_URL=                # Public address of this instance, e.g. https://cleardoc.example.com
+                        # (used for Kosmy Board sign-in; guessed from the request when empty)
 ```
 
 ---
@@ -122,6 +124,33 @@ Once logged in:
 
 ---
 
+## Sign in with Kosmy Board
+
+ClearDoc can be opened from [Kosmy Board](https://github.com/PetitOursManu/Kosmy-Board) without typing a password. Kosmy Board is a standard **OpenID Connect** provider; ClearDoc follows the Kosmy convention:
+
+| Role | Address |
+|---|---|
+| Initiate login URI | `{instance address}/auth/kosmy-board/login` |
+| Redirect URI | `{instance address}/auth/kosmy-board/callback` |
+
+**Setup**
+
+1. In the Board, add your ClearDoc instance (admin page `/admin/login`), open **Edit → Single sign-on** and enable it. Both addresses above are filled in for you.
+2. In ClearDoc, sign in with your password and open **Admin → Kosmy Board** (the four-square icon in the header). Paste the **issuer**, **client ID** and **client secret** shown by the Board, then **Save**. The secret is write-only: it is never displayed again, and leaving the field empty keeps the saved one.
+3. Still on that page, click **Link my Kosmy Board account**. You go through the Board and come back linked.
+
+From then on, **Open** in the Board signs you straight into ClearDoc, and the login page shows a **Sign in with Kosmy Board** button. Signing out of ClearDoc closes the ClearDoc session only.
+
+**Notes**
+
+- Accounts are linked by the Board account identifier (`sub`) and issuer only, never by email (the Board does not verify email addresses). A Board account that is not linked gets no admin rights: it sees a message and can still use the password form.
+- The three values can also be set with environment variables, which take precedence: `KOSMY_BOARD_ISSUER`, `KOSMY_BOARD_CLIENT_ID`, `KOSMY_BOARD_CLIENT_SECRET`.
+- Behind a reverse proxy, set `APP_URL` so the redirect URI matches the one registered in the Board exactly.
+- Replacing the admin account with `npm run setup-admin` removes the link: link the new account again.
+- Security: state, nonce and PKCE (S256) on every sign-in; the state is single use; the issuer is checked at launch and on return; the code is exchanged with `client_secret_basic`; the ID token is fully verified (RS256 signature via `jwks_uri`, `iss`, `aud`, `exp`, `nonce`); `target_link_uri` must be a page of this instance.
+
+---
+
 ## Rich text editor
 
 The description field in the add and edit dialogs uses a rich text editor powered by [TipTap](https://tiptap.dev). Available formatting options:
@@ -180,6 +209,7 @@ The `data/` folder (database + uploaded images) is listed in `.gitignore`. It wi
 | `npm start` | Same as `npm run server` |
 | `npm run build` | Build the frontend for production |
 | `npm run setup-admin` | Create or replace the admin account |
+| `npm test` | Run the tests (Kosmy Board sign-in) |
 
 ---
 
@@ -203,6 +233,12 @@ The `data/` folder (database + uploaded images) is listed in `.gitignore`. It wi
 | `POST` | `/api/auth/login` | Log in — sets a JWT httpOnly cookie |
 | `POST` | `/api/auth/logout` | Log out — clears the cookie |
 | `GET` | `/api/auth/me` | Check if currently logged in |
+| `GET` | `/api/auth/kosmy-board` | Whether sign-in with Kosmy Board is enabled |
+| `GET` | `/auth/kosmy-board/login` | Start sign-in with Kosmy Board (accepts `iss` and `target_link_uri`) |
+| `GET` | `/auth/kosmy-board/callback` | Return from Kosmy Board |
+| `POST` | `/auth/kosmy-board/link` | Link the signed-in admin to a Kosmy Board account |
+| `GET` / `PUT` / `DELETE` | `/api/admin/kosmy-board` | Read, save or erase the Kosmy Board settings (protected) |
+| `POST` | `/api/admin/kosmy-board/unlink` | Unlink the admin account (protected) |
 
 ### Documents (public read, protected write)
 

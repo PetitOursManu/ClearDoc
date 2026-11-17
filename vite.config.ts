@@ -17,6 +17,7 @@ export default defineConfig({
       '/api': 'http://localhost:3001',
       '/uploads': 'http://localhost:3001',
       '/data': 'http://localhost:3001',
+      '/auth': 'http://localhost:3001',
     },
   },
 });
