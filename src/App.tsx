@@ -10,6 +10,7 @@ import { EditDialog } from '@/components/EditDialog';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
+import { KosmyBoardMark } from '@/components/KosmyBoardMark';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePayslipData } from '@/hooks/usePayslipData';
@@ -212,6 +213,15 @@ function App() {
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <Video className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate('/admin/kosmy-board')}
+                  title={t('kosmy.nav')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <KosmyBoardMark className="h-4 w-4" />
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleLogout} title="Déconnexion">
                   <LogOut className="h-4 w-4 mr-1" />

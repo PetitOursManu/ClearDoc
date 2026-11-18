@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import { spawn, execSync } from 'child_process';
 import { generateVideoForDocument } from './services/videoGenerator.js';
+import { createKosmyBoardRouter, migrateKosmyBoard } from './server/kosmyBoard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -137,6 +138,9 @@ try {
 } catch {
   // Colonne déjà existante, ignorer
 }
+
+// Connexion par Kosmy Board : sub + émetteur du Board sur le compte admin (migration idempotente)
+migrateKosmyBoard(db);
 
 // Valeurs par défaut de l'apparence des vidéos
 db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_THEME', 'cleardoc')").run();
@@ -280,6 +284,28 @@ function requireAuth(req, res, next) {
   }
 }
 
+/** Ouvre la session admin (cookie JWT d'une heure). Partagé par le mot de passe et Kosmy Board. */
+function openAdminSession(res, admin) {
+  const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
+  res.cookie('authToken', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 1000
+  });
+}
+
+/** Lit le cookie de session admin ; null s'il est absent, invalide ou expiré. */
+function readAdminSession(token) {
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return typeof decoded?.username === 'string' ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
 function checkRateLimit(ip) {
   const now = new Date().toISOString();
   const attempt = db.prepare('SELECT * FROM login_attempts WHERE ip = ?').get(ip);
@@ -343,14 +369,7 @@ app.post('/api/auth/login', async (req, res) => {
     resetAttempts(ip);
     db.prepare('INSERT INTO login_logs (username, success, ip) VALUES (?, 1, ?)').run(username, ip);
 
-    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
-
-    res.cookie('authToken', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000
-    });
+    openAdminSession(res, admin);
 
     res.json({ ok: true, username: admin.username });
   } catch (err) {
@@ -375,6 +394,25 @@ app.get('/api/auth/me', (req, res) => {
     res.status(401).json({ error: 'Token invalide ou expiré' });
   }
 });
+
+// ============================================
+// ROUTES - CONNEXION PAR KOSMY BOARD (OpenID Connect)
+// ============================================
+
+app.use(createKosmyBoardRouter({
+  db,
+  getSetting,
+  setSetting,
+  delSetting,
+  jwtSecret: JWT_SECRET,
+  openAdminSession,
+  readAdminSession,
+  requireAuth,
+  onLogin: (req, username, success) => {
+    const ip = req.ip || req.socket.remoteAddress;
+    db.prepare('INSERT INTO login_logs (username, success, ip) VALUES (?, ?, ?)').run(username, success ? 1 : 0, ip);
+  },
+}));
 
 // ============================================
 // HELPERS - DOCUMENTS
