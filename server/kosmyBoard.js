@@ -321,6 +321,32 @@ export async function verifyIdToken(idToken, { entry, clientId, nonce }) {
 }
 
 /* ============================================================
+ * Réglages et comptes reliés
+ * ============================================================ */
+
+/**
+ * Les trois réglages de la connexion unique, ou null tant qu'ils ne sont pas
+ * tous définis (priorité env > base, via getSetting).
+ */
+export function readSettings(getSetting) {
+  const issuer = normalizeIssuer(getSetting(SETTING_KEYS.issuer));
+  const clientId = (getSetting(SETTING_KEYS.clientId) || '').trim();
+  const clientSecret = getSetting(SETTING_KEYS.clientSecret) || '';
+  if (!issuer || !clientId || !clientSecret) return null;
+  return { issuer, clientId, clientSecret };
+}
+
+/**
+ * Le compte admin relié à ce compte du Board : par `sub` et émetteur
+ * uniquement, jamais par l'e-mail. null si aucun.
+ */
+export function findLinkedAdmin(db, issuer, sub) {
+  if (typeof sub !== 'string' || !sub) return null;
+  return db.prepare('SELECT * FROM admin_users WHERE kosmy_board_issuer = ? AND kosmy_board_sub = ?')
+    .get(issuer, sub) || null;
+}
+
+/* ============================================================
  * Base de données
  * ============================================================ */
 
@@ -368,13 +394,7 @@ export function createKosmyBoardRouter(o) {
     return true;
   }
 
-  function getSettings() {
-    const issuer = normalizeIssuer(getSetting(SETTING_KEYS.issuer));
-    const clientId = (getSetting(SETTING_KEYS.clientId) || '').trim();
-    const clientSecret = getSetting(SETTING_KEYS.clientSecret) || '';
-    if (!issuer || !clientId || !clientSecret) return null;
-    return { issuer, clientId, clientSecret };
-  }
+  const getSettings = () => readSettings(getSetting);
 
   function flowCookieOptions(base, maxAgeMs = FLOW_TTL_SECONDS * 1000) {
     return {
@@ -586,8 +606,7 @@ export function createKosmyBoardRouter(o) {
       if (flow.mode === 'link') return finishLink(req, res, base, flow, settings.issuer, claims.sub);
 
       // Liaison par `sub` (et émetteur) uniquement : jamais par l'e-mail.
-      const admin = db.prepare('SELECT * FROM admin_users WHERE kosmy_board_issuer = ? AND kosmy_board_sub = ?')
-        .get(settings.issuer, claims.sub);
+      const admin = findLinkedAdmin(db, settings.issuer, claims.sub);
       if (!admin) {
         logLogin(req, `kosmy-board:${claims.sub}`, false);
         return redirectWithError(res, base, LOGIN_PAGE, 'unknown_account');

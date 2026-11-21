@@ -113,6 +113,9 @@ const THEMES = {
   },
 };
 
+/** Identifiants des thèmes vidéo (réglage VIDEO_THEME). */
+export const VIDEO_THEME_IDS = Object.keys(THEMES);
+
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
 
 // Luminance relative approximative d'une couleur hex (#rrggbb)
