@@ -151,6 +151,35 @@ From then on, **Open** in the Board signs you straight into ClearDoc, and the lo
 
 ---
 
+## Admin in Kosmy Board
+
+The Board's **Admin** button can also show ClearDoc's administration **inside the Board**, without opening ClearDoc. ClearDoc describes its admin screens in a small JSON API (protocol `kosmy.board-admin.v1`, see the [specification](https://github.com/PetitOursManu/Kosmy-Board/blob/main/docs/admin-api.md)); the Board displays them and sends the actions back to ClearDoc, which runs them with the same code and rules as its own admin pages.
+
+**What it shows**
+
+| Section | Content |
+|---|---|
+| Overview | Counts (payslip lines, categories, structures, PDFs, zones, videos), instance details, a warning when a generated video awaits validation |
+| Payslip lines | List with category, keywords and video; add a line, rename, change category, delete |
+| Categories | Add, rename, delete (only when no line uses it) |
+| Structures and PDFs | Structures (add, rename, delete), PDF files (delete), assignments (assign, remove) |
+| Interactive payslip | Zones (link to another line, delete), model image status |
+| Videos | Publish or reject the video awaiting validation, delete a published video, delete the watermark |
+| Settings | AI and voice services (API keys are write-only), default video appearance |
+| Access | Admin accounts, Kosmy Board sign-in settings (read-only, never the client secret), recent sign-ins |
+
+Rich text descriptions, image, PDF and watermark uploads, drawing zones, generating a video and installing Remotion stay in ClearDoc's own admin.
+
+**Requirements**
+
+- [Sign in with Kosmy Board](#sign-in-with-kosmy-board) is configured (issuer, client ID, client secret): the Board's requests are signed with the same key as its ID tokens and checked with the same settings.
+- Your ClearDoc admin account is **linked** to your Board account (**Admin → Kosmy Board → Link my Kosmy Board account**). The Board only says who you are; ClearDoc gives the rights. An unlinked Board account is refused.
+- The Board's **server** can reach ClearDoc at the address saved in the Board.
+
+Each request carries a 60-second, single-use token. ClearDoc checks the RS256 signature (`jwks_uri`), `typ: kb-admin+jwt` (an ID token is never accepted), `iss`, `aud` (the client ID), `exp`, the method and address it was made for (`htm`, `htu`) and that its `jti` was never used. These addresses answer JSON only, without CORS. Texts follow the Board's language (French or English).
+
+---
+
 ## Rich text editor
 
 The description field in the add and edit dialogs uses a rich text editor powered by [TipTap](https://tiptap.dev). Available formatting options:
@@ -209,7 +238,7 @@ The `data/` folder (database + uploaded images) is listed in `.gitignore`. It wi
 | `npm start` | Same as `npm run server` |
 | `npm run build` | Build the frontend for production |
 | `npm run setup-admin` | Create or replace the admin account |
-| `npm test` | Run the tests (Kosmy Board sign-in) |
+| `npm test` | Run the tests (Kosmy Board sign-in and admin in the Board) |
 
 ---
 
@@ -239,6 +268,8 @@ The `data/` folder (database + uploaded images) is listed in `.gitignore`. It wi
 | `POST` | `/auth/kosmy-board/link` | Link the signed-in admin to a Kosmy Board account |
 | `GET` / `PUT` / `DELETE` | `/api/admin/kosmy-board` | Read, save or erase the Kosmy Board settings (protected) |
 | `POST` | `/api/admin/kosmy-board/unlink` | Unlink the admin account (protected) |
+| `GET` | `/api/kosmy-board/admin` | Admin in Kosmy Board: list of sections (Board token) |
+| `GET` / `POST` | `/api/kosmy-board/admin/{section}` | Admin in Kosmy Board: a section, or an action in it (Board token) |
 
 ### Documents (public read, protected write)
 

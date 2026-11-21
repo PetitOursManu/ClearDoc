@@ -13,6 +13,8 @@ import cookieParser from 'cookie-parser';
 import { spawn, execSync } from 'child_process';
 import { generateVideoForDocument } from './services/videoGenerator.js';
 import { createKosmyBoardRouter, migrateKosmyBoard } from './server/kosmyBoard.js';
+import { createKosmyBoardAdminRouter } from './server/kosmyBoardAdmin.js';
+import { createAdminActions, AdminActionError } from './server/adminActions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,6 +46,7 @@ if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
 if (!fs.existsSync(BRANDING_DIR)) fs.mkdirSync(BRANDING_DIR, { recursive: true });
 
 const WATERMARK_PATH = path.join(BRANDING_DIR, 'watermark.png');
+const REMOTION_DIR = path.join(__dirname, 'node_modules', 'remotion');
 
 const db = new Database(DB_PATH);
 
@@ -187,6 +190,35 @@ function setSetting(key, value) {
 function delSetting(key) {
   db.prepare('DELETE FROM settings WHERE key = ?').run(key);
 }
+
+// ============================================
+// FONCTIONS DE L'ADMIN — partagées par les routes ci-dessous et l'admin dans Kosmy Board
+// ============================================
+
+const adminActions = createAdminActions({
+  db,
+  getSetting,
+  setSetting,
+  delSetting,
+  uploadsDir: UPLOADS_DIR,
+  videosDir: VIDEOS_DIR,
+  watermarkPath: WATERMARK_PATH,
+  remotionDir: REMOTION_DIR,
+});
+
+/** Erreur prévue (introuvable, saisie refusée, conflit) : son statut et son message ; sinon 500. */
+function sendActionError(res, err) {
+  if (err instanceof AdminActionError) return res.status(err.status).json({ error: err.message });
+  res.status(500).json({ error: err.message });
+}
+
+// ============================================
+// ADMIN DANS KOSMY BOARD (API appelée par le serveur du Board)
+// ============================================
+
+// Monté avant tout le reste : pas de CORS, pas de cookie de session, pas de
+// page de l'interface ; ces adresses répondent toujours en JSON.
+app.use(createKosmyBoardAdminRouter({ db, getSetting, actions: adminActions }));
 
 // ============================================
 // MIDDLEWARE
@@ -415,119 +447,46 @@ app.use(createKosmyBoardRouter({
 }));
 
 // ============================================
-// HELPERS - DOCUMENTS
-// ============================================
-
-function parseDocument(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    imageUrl: row.image_path || '',
-    videoUrl: row.video_url || '',
-    category: row.category,
-    keywords: JSON.parse(row.keywords || '[]'),
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  };
-}
-
-// ============================================
 // ROUTES - DOCUMENTS (lecture publique, écriture protégée)
 // ============================================
 
 app.get('/api/documents', (_req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM documents ORDER BY created_at DESC').all();
-    res.json({ _fromServer: true, items: rows.map(parseDocument) });
+    res.json({ _fromServer: true, items: adminActions.listDocuments() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.get('/api/documents/:id', (req, res) => {
   try {
-    const row = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
-    if (!row) return res.status(404).json({ error: 'Document non trouvé' });
-    res.json({ _fromServer: true, ...parseDocument(row) });
+    res.json({ _fromServer: true, ...adminActions.getDocument(req.params.id) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.post('/api/documents', requireAuth, (req, res) => {
   try {
-    const { id, title, description, image_path, imageUrl, category, keywords } = req.body;
-    const docId = id || uuidv4();
-    const imagePath = image_path || imageUrl || null;
-    const keywordsStr = JSON.stringify(Array.isArray(keywords) ? keywords : []);
-
-    db.prepare(`
-      INSERT INTO documents (id, title, description, image_path, category, keywords)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(docId, title || '', description || '', imagePath, category || 'autres', keywordsStr);
-
-    const created = parseDocument(db.prepare('SELECT * FROM documents WHERE id = ?').get(docId));
-    res.status(201).json({ _fromServer: true, ...created });
+    res.status(201).json({ _fromServer: true, ...adminActions.createDocument(req.body) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.put('/api/documents/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Document non trouvé' });
-
-    const { title, description, image_path, imageUrl, category, keywords } = req.body;
-    const imagePath = image_path !== undefined ? image_path
-      : imageUrl !== undefined ? imageUrl
-      : existing.image_path;
-    const keywordsStr = keywords !== undefined
-      ? JSON.stringify(Array.isArray(keywords) ? keywords : [])
-      : existing.keywords;
-
-    db.prepare(`
-      UPDATE documents SET
-        title = ?,
-        description = ?,
-        image_path = ?,
-        category = ?,
-        keywords = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      title !== undefined ? title : existing.title,
-      description !== undefined ? description : existing.description,
-      imagePath,
-      category !== undefined ? category : existing.category,
-      keywordsStr,
-      req.params.id
-    );
-
-    const updated = parseDocument(db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id));
-    res.json({ _fromServer: true, ...updated });
+    res.json({ _fromServer: true, ...adminActions.updateDocument(req.params.id, req.body) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.delete('/api/documents/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Document non trouvé' });
-
-    if (existing.image_path) {
-      const filename = path.basename(existing.image_path);
-      const filePath = path.join(UPLOADS_DIR, filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-
-    db.prepare('DELETE FROM documents WHERE id = ?').run(req.params.id);
-    res.json({ ok: true, id: req.params.id });
+    res.json(adminActions.deleteDocument(req.params.id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -551,10 +510,9 @@ app.post('/api/upload', requireAuth, upload.single('image'), (req, res) => {
 
 app.get('/api/categories', (_req, res) => {
   try {
-    const categories = db.prepare('SELECT * FROM categories ORDER BY id').all();
-    res.json({ _fromServer: true, categories });
+    res.json({ _fromServer: true, categories: adminActions.listCategories() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -580,53 +538,25 @@ app.put('/api/categories', requireAuth, (req, res) => {
 
 app.post('/api/categories', requireAuth, (req, res) => {
   try {
-    const { title } = req.body;
-    if (!title || !title.trim()) {
-      return res.status(400).json({ error: 'Le titre de la catégorie est requis' });
-    }
-    const catId = uuidv4();
-    db.prepare('INSERT INTO categories (id, title) VALUES (?, ?)').run(catId, title.trim());
-    const created = db.prepare('SELECT * FROM categories WHERE id = ?').get(catId);
-    res.status(201).json({ _fromServer: true, ...created });
+    res.status(201).json({ _fromServer: true, ...adminActions.createCategory(req.body.title) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.delete('/api/categories/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Catégorie non trouvée' });
-
-    const usageCount = db.prepare('SELECT COUNT(*) as count FROM documents WHERE category = ?').get(req.params.id);
-    if (usageCount.count > 0) {
-      return res.status(409).json({
-        error: `Impossible de supprimer cette catégorie, elle est utilisée par ${usageCount.count} description(s)`
-      });
-    }
-
-    db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
-    res.json({ ok: true, id: req.params.id });
+    res.json(adminActions.deleteCategory(req.params.id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.patch('/api/categories/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Catégorie non trouvée' });
-
-    const { title } = req.body;
-    if (!title || !title.trim()) {
-      return res.status(400).json({ error: 'Le titre de la catégorie est requis' });
-    }
-
-    db.prepare('UPDATE categories SET title = ? WHERE id = ?').run(title.trim(), req.params.id);
-    const updated = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
-    res.json({ _fromServer: true, ...updated });
+    res.json({ _fromServer: true, ...adminActions.renameCategory(req.params.id, req.body.title) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -691,65 +621,35 @@ app.delete('/api/descriptions/:id', requireAuth, (req, res) => {
 // ROUTES - PAYSLIP ZONES (lecture publique, écriture protégée)
 // ============================================
 
-const ZONE_SELECT = `
-  SELECT pz.id, pz.document_id, pz.x, pz.y, pz.width, pz.height, pz.created_at,
-         d.title as document_title
-  FROM payslip_zones pz
-  LEFT JOIN documents d ON pz.document_id = d.id
-`;
-
 app.get('/api/payslip-zones', (_req, res) => {
   try {
-    const zones = db.prepare(`${ZONE_SELECT} ORDER BY pz.created_at ASC`).all();
-    res.json({ _fromServer: true, zones });
+    res.json({ _fromServer: true, zones: adminActions.listZones() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.post('/api/payslip-zones', requireAuth, (req, res) => {
   try {
-    const { document_id, x, y, width, height } = req.body;
-    if (!document_id) return res.status(400).json({ error: 'document_id requis' });
-    const id = uuidv4();
-    db.prepare('INSERT INTO payslip_zones (id, document_id, x, y, width, height) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, document_id, Number(x), Number(y), Number(width), Number(height));
-    const created = db.prepare(`${ZONE_SELECT} WHERE pz.id = ?`).get(id);
-    res.status(201).json({ _fromServer: true, ...created });
+    res.status(201).json({ _fromServer: true, ...adminActions.createZone(req.body) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.put('/api/payslip-zones/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM payslip_zones WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Zone non trouvée' });
-    const { document_id, x, y, width, height } = req.body;
-    db.prepare('UPDATE payslip_zones SET document_id = ?, x = ?, y = ?, width = ?, height = ? WHERE id = ?')
-      .run(
-        document_id ?? existing.document_id,
-        x !== undefined ? Number(x) : existing.x,
-        y !== undefined ? Number(y) : existing.y,
-        width !== undefined ? Number(width) : existing.width,
-        height !== undefined ? Number(height) : existing.height,
-        req.params.id
-      );
-    const updated = db.prepare(`${ZONE_SELECT} WHERE pz.id = ?`).get(req.params.id);
-    res.json({ _fromServer: true, ...updated });
+    res.json({ _fromServer: true, ...adminActions.updateZone(req.params.id, req.body) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.delete('/api/payslip-zones/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM payslip_zones WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Zone non trouvée' });
-    db.prepare('DELETE FROM payslip_zones WHERE id = ?').run(req.params.id);
-    res.json({ ok: true, id: req.params.id });
+    res.json(adminActions.deleteZone(req.params.id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -759,10 +659,9 @@ app.delete('/api/payslip-zones/:id', requireAuth, (req, res) => {
 
 app.get('/api/payslip-settings', (_req, res) => {
   try {
-    const setting = db.prepare("SELECT value FROM payslip_settings WHERE key = 'model_image_path'").get();
-    res.json({ _fromServer: true, model_image_path: setting?.value || null });
+    res.json({ _fromServer: true, model_image_path: adminActions.payslipModelImage() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -783,49 +682,33 @@ app.post('/api/payslip-settings/image', requireAuth, upload.single('image'), (re
 
 app.get('/api/companies', (_req, res) => {
   try {
-    const companies = db.prepare('SELECT * FROM companies ORDER BY name').all();
-    res.json({ _fromServer: true, companies });
+    res.json({ _fromServer: true, companies: adminActions.listCompanies() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.post('/api/companies', requireAuth, (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
-    const id = uuidv4();
-    db.prepare('INSERT INTO companies (id, name) VALUES (?, ?)').run(id, name.trim());
-    const created = db.prepare('SELECT * FROM companies WHERE id = ?').get(id);
-    res.status(201).json({ _fromServer: true, ...created });
+    res.status(201).json({ _fromServer: true, ...adminActions.createCompany(req.body.name) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.patch('/api/companies/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Entreprise non trouvée' });
-    const { name } = req.body;
-    if (!name?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
-    db.prepare('UPDATE companies SET name = ? WHERE id = ?').run(name.trim(), req.params.id);
-    const updated = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
-    res.json({ _fromServer: true, ...updated });
+    res.json({ _fromServer: true, ...adminActions.renameCompany(req.params.id, req.body.name) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.delete('/api/companies/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Entreprise non trouvée' });
-    db.prepare('DELETE FROM company_pdfs WHERE company_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM companies WHERE id = ?').run(req.params.id);
-    res.json({ ok: true, id: req.params.id });
+    res.json(adminActions.deleteCompany(req.params.id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -835,20 +718,9 @@ app.delete('/api/companies/:id', requireAuth, (req, res) => {
 
 app.get('/api/pdf-files', (req, res) => {
   try {
-    const { company_id } = req.query;
-    if (company_id) {
-      const pdfs = db.prepare(`
-        SELECT pf.* FROM pdf_files pf
-        INNER JOIN company_pdfs cp ON cp.pdf_id = pf.id
-        WHERE cp.company_id = ?
-        ORDER BY pf.name
-      `).all(company_id);
-      return res.json({ _fromServer: true, pdfs });
-    }
-    const pdfs = db.prepare('SELECT * FROM pdf_files ORDER BY name').all();
-    res.json({ _fromServer: true, pdfs });
+    res.json({ _fromServer: true, pdfs: adminActions.listPdfFiles(req.query.company_id) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -869,15 +741,9 @@ app.post('/api/pdf-files/upload', requireAuth, pdfUpload.single('pdf'), (req, re
 
 app.delete('/api/pdf-files/:id', requireAuth, (req, res) => {
   try {
-    const existing = db.prepare('SELECT * FROM pdf_files WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Fichier non trouvé' });
-    const filePath = path.join(UPLOADS_DIR, path.basename(existing.filename));
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    db.prepare('DELETE FROM company_pdfs WHERE pdf_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM pdf_files WHERE id = ?').run(req.params.id);
-    res.json({ ok: true, id: req.params.id });
+    res.json(adminActions.deletePdfFile(req.params.id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -885,33 +751,28 @@ app.delete('/api/pdf-files/:id', requireAuth, (req, res) => {
 // ROUTES - COMPANY-PDF ASSIGNMENTS
 // ============================================
 
-app.get('/api/company-pdfs', requireAuth, (req, res) => {
+app.get('/api/company-pdfs', requireAuth, (_req, res) => {
   try {
-    const assignments = db.prepare('SELECT company_id, pdf_id FROM company_pdfs').all();
-    res.json({ _fromServer: true, assignments });
+    res.json({ _fromServer: true, assignments: adminActions.listAssignments() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.post('/api/company-pdfs', requireAuth, (req, res) => {
   try {
     const { company_id, pdf_id } = req.body;
-    if (!company_id || !pdf_id) return res.status(400).json({ error: 'company_id et pdf_id requis' });
-    db.prepare('INSERT OR IGNORE INTO company_pdfs (company_id, pdf_id) VALUES (?, ?)').run(company_id, pdf_id);
-    res.status(201).json({ ok: true });
+    res.status(201).json(adminActions.assignPdf(company_id, pdf_id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
 app.delete('/api/company-pdfs/:company_id/:pdf_id', requireAuth, (req, res) => {
   try {
-    db.prepare('DELETE FROM company_pdfs WHERE company_id = ? AND pdf_id = ?')
-      .run(req.params.company_id, req.params.pdf_id);
-    res.json({ ok: true });
+    res.json(adminActions.unassignPdf(req.params.company_id, req.params.pdf_id));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendActionError(res, err);
   }
 });
 
@@ -922,7 +783,6 @@ app.delete('/api/company-pdfs/:company_id/:pdf_id', requireAuth, (req, res) => {
 // Un seul render Remotion à la fois (contrainte mémoire/CPU du conteneur).
 let renderInProgress = false;
 
-const REMOTION_DIR = path.join(__dirname, 'node_modules', 'remotion');
 const VIDEOS_CODE_DIR = path.join(__dirname, 'src', 'videos');
 const ROOT_TSX_PATH = path.join(__dirname, 'src', 'Root.tsx');
 
@@ -940,17 +800,7 @@ function sseWrite(res, payload) {
 
 // --- Statut Remotion ---
 app.get('/api/admin/remotion/status', requireAuth, (_req, res) => {
-  const installed = fs.existsSync(REMOTION_DIR);
-  let version = null;
-  if (installed) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(REMOTION_DIR, 'package.json'), 'utf-8'));
-      version = pkg.version;
-    } catch {
-      // package.json illisible, on ignore
-    }
-  }
-  res.json({ installed, version });
+  res.json(adminActions.remotionStatus());
 });
 
 // --- Installation Remotion (SSE) ---
@@ -1001,51 +851,22 @@ app.post('/api/admin/remotion/uninstall', requireAuth, (_req, res) => {
 });
 
 // --- Lecture des paramètres (clés masquées) ---
-const SETTINGS_KEYS = [
-  'AI_API_KEY', 'AI_API_BASE_URL', 'AI_MODEL', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID',
-  'VIDEO_THEME', 'VIDEO_ACCENT_COLOR', 'VIDEO_WATERMARK_POSITION', 'VIDEO_WATERMARK_SIZE',
-  'VIDEO_QUALITY', 'VIDEO_BG_MODE', 'VIDEO_BG_COLOR1', 'VIDEO_BG_COLOR2', 'VIDEO_BG_ANGLE',
-];
-
 app.get('/api/admin/settings', requireAuth, (_req, res) => {
-  const result = {};
-  for (const key of SETTINGS_KEYS) {
-    const val = getSetting(key);
-    // Masquer les clés API sauf les 4 derniers caractères
-    result[key] = val
-      ? (key.includes('KEY') ? '***' + val.slice(-4) : val)
-      : '';
-    // Indiquer si la valeur provient des variables d'environnement (non modifiable en base)
-    result[`${key}__fromEnv`] = Boolean(process.env[key]);
-  }
-  res.json(result);
+  res.json(adminActions.readMaskedSettings());
 });
 
 // --- Enregistrement des paramètres ---
 app.post('/api/admin/settings', requireAuth, (req, res) => {
   try {
-    for (const [key, value] of Object.entries(req.body)) {
-      // On ignore les valeurs vides ou encore masquées (préfixe ***)
-      if (SETTINGS_KEYS.includes(key) && value && !String(value).startsWith('***')) {
-        db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)')
-          .run(key, String(value));
-      }
-    }
-    res.json({ success: true });
+    res.json(adminActions.saveSettings(req.body));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendActionError(res, e);
   }
 });
 
 // --- Watermark : statut ---
 app.get('/api/admin/video-watermark', requireAuth, (_req, res) => {
-  const exists = fs.existsSync(WATERMARK_PATH);
-  res.json({
-    exists,
-    url: exists ? `/data/branding/watermark.png?t=${fs.statSync(WATERMARK_PATH).mtimeMs}` : null,
-    position: getSetting('VIDEO_WATERMARK_POSITION') || 'bottom-right',
-    size: getSetting('VIDEO_WATERMARK_SIZE') || 'medium',
-  });
+  res.json(adminActions.watermarkStatus());
 });
 
 // --- Watermark : upload (PNG) ---
@@ -1060,44 +881,27 @@ app.post('/api/admin/video-watermark', requireAuth, (req, res) => {
 // --- Watermark : suppression ---
 app.delete('/api/admin/video-watermark', requireAuth, (_req, res) => {
   try {
-    if (fs.existsSync(WATERMARK_PATH)) fs.unlinkSync(WATERMARK_PATH);
-    res.json({ ok: true });
+    res.json(adminActions.deleteWatermark());
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendActionError(res, e);
   }
 });
 
 // --- Liste des documents possédant une vidéo ---
 app.get('/api/admin/videos', requireAuth, (_req, res) => {
   try {
-    const rows = db.prepare(
-      "SELECT id, title, video_url FROM documents WHERE video_url IS NOT NULL AND video_url != '' ORDER BY title ASC"
-    ).all();
-    res.json({ videos: rows.map(r => ({ documentId: r.id, title: r.title, videoUrl: r.video_url })) });
+    res.json({ videos: adminActions.listVideos() });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendActionError(res, e);
   }
 });
 
 // --- Dernière vidéo générée mais non encore validée ---
 app.get('/api/admin/videos/pending', requireAuth, (_req, res) => {
   try {
-    const raw = getSetting('VIDEO_PENDING');
-    if (!raw) return res.json({ pending: null });
-    let p;
-    try { p = JSON.parse(raw); } catch { delSetting('VIDEO_PENDING'); return res.json({ pending: null }); }
-    const base = path.basename(p.videoUrl || '');
-    // Fichier disparu (conteneur recréé, etc.) -> on nettoie
-    if (!base || !fs.existsSync(path.join(VIDEOS_DIR, base))) {
-      delSetting('VIDEO_PENDING');
-      return res.json({ pending: null });
-    }
-    // Déjà publiée entre-temps -> plus "en attente"
-    const published = db.prepare('SELECT id FROM documents WHERE video_url = ?').get(`/data/videos/${base}`);
-    if (published) { delSetting('VIDEO_PENDING'); return res.json({ pending: null }); }
-    res.json({ pending: { documentId: p.documentId, title: p.title, videoUrl: `/data/videos/${base}`, createdAt: p.createdAt || null } });
+    res.json({ pending: adminActions.getPendingVideo() });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendActionError(res, e);
   }
 });
 
@@ -1153,74 +957,27 @@ app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res)
 // --- Validation/publication d'une vidéo sur la fiche ---
 app.post('/api/admin/videos/publish/:documentId', requireAuth, (req, res) => {
   try {
-    const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
-    if (!doc) return res.status(404).json({ error: 'Document introuvable' });
-
-    const { videoUrl } = req.body || {};
-    if (!videoUrl || typeof videoUrl !== 'string') {
-      return res.status(400).json({ error: 'videoUrl requis' });
-    }
-
-    // Sécurité : n'accepter qu'un fichier réellement présent dans data/videos (anti path-traversal)
-    const base = path.basename(videoUrl);
-    const filePath = path.join(VIDEOS_DIR, base);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Fichier vidéo introuvable' });
-    }
-
-    const safeUrl = `/data/videos/${base}`;
-    db.prepare('UPDATE documents SET video_url = ? WHERE id = ?').run(safeUrl, doc.id);
-    // La vidéo en attente vient d'être publiée -> on l'oublie
-    const pendingRaw = getSetting('VIDEO_PENDING');
-    if (pendingRaw) {
-      try { if (JSON.parse(pendingRaw).documentId === doc.id) delSetting('VIDEO_PENDING'); } catch { /* ignore */ }
-    }
-    res.json({ ok: true, videoUrl: safeUrl });
+    res.json(adminActions.publishVideo(req.params.documentId, (req.body || {}).videoUrl));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendActionError(res, e);
   }
 });
 
 // --- Rejet d'une vidéo générée mais non publiée ---
 app.post('/api/admin/videos/discard', requireAuth, (req, res) => {
   try {
-    const { videoUrl } = req.body || {};
-    if (!videoUrl || typeof videoUrl !== 'string') {
-      return res.status(400).json({ error: 'videoUrl requis' });
-    }
-    const base = path.basename(videoUrl);
-    // Ne pas supprimer un fichier encore référencé par un document publié
-    const used = db.prepare('SELECT id FROM documents WHERE video_url = ?').get(`/data/videos/${base}`);
-    if (used) {
-      return res.status(409).json({ error: 'Vidéo publiée : utilisez la suppression depuis la liste.' });
-    }
-    const filePath = path.join(VIDEOS_DIR, base);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    // Si c'était la vidéo en attente, on l'oublie
-    const pendingRaw = getSetting('VIDEO_PENDING');
-    if (pendingRaw) {
-      try { if (path.basename(JSON.parse(pendingRaw).videoUrl || '') === base) delSetting('VIDEO_PENDING'); } catch { /* ignore */ }
-    }
-    res.json({ ok: true });
+    res.json(adminActions.discardVideo((req.body || {}).videoUrl));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendActionError(res, e);
   }
 });
 
 // --- Suppression d'une vidéo ---
 app.delete('/api/admin/videos/:documentId', requireAuth, (req, res) => {
   try {
-    const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.documentId);
-    if (!doc) return res.status(404).json({ error: 'Document introuvable' });
-
-    if (doc.video_url) {
-      const filePath = path.join(VIDEOS_DIR, path.basename(doc.video_url));
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-    db.prepare('UPDATE documents SET video_url = NULL WHERE id = ?').run(doc.id);
-    res.json({ ok: true, id: doc.id });
+    res.json(adminActions.deleteVideo(req.params.documentId));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    sendActionError(res, e);
   }
 });
 
