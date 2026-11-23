@@ -18,6 +18,7 @@ import {
   safeTarget, codeChallenge, basicAuthHeader, normalizeIssuer, signFlow, verifyFlow,
   FLOW_COOKIE, SETTING_KEYS,
 } from '../server/kosmyBoard.js';
+import { migrateAccounts, createAdminSessions } from '../server/accounts.js';
 
 const SECRET = 'test-secret-for-cleardoc';
 const CLIENT_ID = 'kb-cleardoc-test';
@@ -85,19 +86,18 @@ function startClearDoc() {
   `);
   migrateKosmyBoard(db);
   migrateKosmyBoard(db); // idempotente
+  migrateAccounts(db);
+  migrateAccounts(db); // idempotente
   db.prepare("INSERT INTO admin_users (id, username, password_hash) VALUES ('a1', 'admin', 'x')").run();
 
   const getSetting = (k) => db.prepare('SELECT value FROM settings WHERE key = ?').get(k)?.value || null;
   const setSetting = (k, v) => db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(k, v);
   const delSetting = (k) => db.prepare('DELETE FROM settings WHERE key = ?').run(k);
-  const openAdminSession = (res, admin) => res.cookie('authToken', jwt.sign({ username: admin.username }, SECRET, { expiresIn: '1h' }));
-  const readAdminSession = (t) => { try { return t ? jwt.verify(t, SECRET) : null; } catch { return null; } };
-  const requireAuth = (req, res, next) => {
-    const s = readAdminSession(req.cookies?.authToken);
-    if (!s) return res.status(401).json({ error: 'Non authentifié' });
-    req.admin = s;
-    next();
-  };
+  // Les vraies sessions de ClearDoc (server/accounts.js), comme server.js.
+  const sessions = createAdminSessions({ db, jwtSecret: SECRET, secure: false });
+  const openAdminSession = sessions.open;
+  const readAdminSession = sessions.read;
+  const requireAuth = sessions.requireAuth;
 
   const app = express();
   app.use(express.json());
@@ -385,6 +385,19 @@ describe('liaison du compte admin', () => {
     const back = await callback(start, { cookies: { authToken: sessionCookie('autre') } });
     assert.equal(errorOf(back), 'session');
     app.db.prepare("DELETE FROM admin_users WHERE id = 'a2'").run();
+  });
+
+  test('un compte sans mot de passe (créé par le Board) ne peut pas être délié', async () => {
+    app.db.prepare("INSERT INTO admin_users (id, username, password_hash) VALUES ('a3', 'board-only', '')").run();
+    app.db.prepare("UPDATE admin_users SET kosmy_board_sub = 'sub-a3', kosmy_board_issuer = ? WHERE id = 'a3'").run(board.issuer);
+    const headers = { Cookie: cookieHeader({ authToken: sessionCookie('board-only') }) };
+    const config = await (await fetch(`${app.base}/api/admin/kosmy-board`, { headers })).json();
+    assert.equal(config.hasPassword, false);
+    const res = await fetch(`${app.base}/api/admin/kosmy-board/unlink`, { method: 'POST', headers });
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).error, 'no_password');
+    assert.equal(app.db.prepare("SELECT kosmy_board_sub FROM admin_users WHERE id = 'a3'").get().kosmy_board_sub, 'sub-a3');
+    app.db.prepare("DELETE FROM admin_users WHERE id = 'a3'").run();
   });
 
   test('délier', async () => {

@@ -35,7 +35,9 @@ const question = (prompt) => new Promise(resolve => rl.question(prompt, resolve)
 async function main() {
   console.log('=== Création du compte administrateur ClearDoc ===\n');
 
-  const existing = db.prepare('SELECT COUNT(*) as count FROM admin_users').get();
+  // Seuls les comptes à mot de passe sont remplacés : ceux créés par Kosmy Board
+  // (sans mot de passe, gérés depuis le Board) sont gardés.
+  const existing = db.prepare("SELECT COUNT(*) as count FROM admin_users WHERE password_hash != ''").get();
   if (existing.count > 0) {
     const answer = await question('Un compte admin existe déjà. Voulez-vous le remplacer ? (oui/non) : ');
     if (answer.toLowerCase() !== 'oui') {
@@ -61,7 +63,7 @@ async function main() {
 
   try {
     const hash = await bcrypt.hash(password.trim(), 12);
-    db.prepare('DELETE FROM admin_users').run();
+    db.prepare("DELETE FROM admin_users WHERE password_hash != ''").run();
     db.prepare('INSERT INTO admin_users (id, username, password_hash) VALUES (?, ?, ?)')
       .run(uuidv4(), username.trim(), hash);
 

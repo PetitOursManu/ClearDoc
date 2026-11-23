@@ -7,13 +7,13 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import { spawn, execSync } from 'child_process';
 import { generateVideoForDocument } from './services/videoGenerator.js';
 import { createKosmyBoardRouter, migrateKosmyBoard } from './server/kosmyBoard.js';
-import { createKosmyBoardAdminRouter } from './server/kosmyBoardAdmin.js';
+import { createKosmyBoardAdminRouter, createJtiStore } from './server/kosmyBoardAdmin.js';
+import { createKosmyBoardUsersRouter } from './server/kosmyBoardUsers.js';
+import { migrateAccounts, createAdminSessions, checkPassword, canGenerateVideos } from './server/accounts.js';
 import { createAdminActions, AdminActionError } from './server/adminActions.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -144,6 +144,8 @@ try {
 
 // Connexion par Kosmy Board : sub + émetteur du Board sur le compte admin (migration idempotente)
 migrateKosmyBoard(db);
+// Comptes : nom, e-mail, état (désactivé), version de session, restrictions (migration idempotente)
+migrateAccounts(db);
 
 // Valeurs par défaut de l'apparence des vidéos
 db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('VIDEO_THEME', 'cleardoc')").run();
@@ -216,9 +218,13 @@ function sendActionError(res, err) {
 // ADMIN DANS KOSMY BOARD (API appelée par le serveur du Board)
 // ============================================
 
-// Monté avant tout le reste : pas de CORS, pas de cookie de session, pas de
-// page de l'interface ; ces adresses répondent toujours en JSON.
-app.use(createKosmyBoardAdminRouter({ db, getSetting, actions: adminActions }));
+// Montés avant tout le reste : pas de CORS, pas de cookie de session, pas de
+// page de l'interface ; ces adresses répondent toujours en JSON. Les deux
+// protocoles partagent le même jeton du Board, donc les mêmes `jti` déjà reçus.
+const boardJtis = createJtiStore();
+app.use(createKosmyBoardAdminRouter({ db, getSetting, actions: adminActions, jtis: boardJtis }));
+// Utilisateurs gérés par Kosmy Board (kosmy.board-users.v1)
+app.use(createKosmyBoardUsersRouter({ db, getSetting, jtis: boardJtis }));
 
 // ============================================
 // MIDDLEWARE
@@ -303,40 +309,13 @@ const watermarkUpload = multer({
 // AUTH - HELPERS
 // ============================================
 
-function requireAuth(req, res, next) {
-  const token = req.cookies?.authToken;
-  if (!token) return res.status(401).json({ error: 'Non authentifié' });
-
-  try {
-    req.admin = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch {
-    res.clearCookie('authToken');
-    return res.status(401).json({ error: 'Token invalide ou expiré' });
-  }
-}
-
-/** Ouvre la session admin (cookie JWT d'une heure). Partagé par le mot de passe et Kosmy Board. */
-function openAdminSession(res, admin) {
-  const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
-  res.cookie('authToken', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 1000
-  });
-}
-
-/** Lit le cookie de session admin ; null s'il est absent, invalide ou expiré. */
-function readAdminSession(token) {
-  if (!token) return null;
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return typeof decoded?.username === 'string' ? decoded : null;
-  } catch {
-    return null;
-  }
-}
+// Sessions (cookie JWT d'une heure), partagées par le mot de passe et Kosmy Board.
+// Le compte est relu à chaque requête : un compte désactivé perd aussitôt ses
+// sessions ouvertes (server/accounts.js).
+const adminSessions = createAdminSessions({ db, jwtSecret: JWT_SECRET });
+const requireAuth = adminSessions.requireAuth;
+const openAdminSession = adminSessions.open;
+const readAdminSession = adminSessions.read;
 
 function checkRateLimit(ip) {
   const now = new Date().toISOString();
@@ -390,9 +369,14 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   try {
-    const admin = db.prepare('SELECT * FROM admin_users WHERE username = ?').get(username);
+    // Un compte créé par Kosmy Board n'a pas de mot de passe : il se connecte par le Board.
+    const { account: admin, error } = await checkPassword(db, username, password);
 
-    if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
+    if (error === 'disabled') {
+      db.prepare('INSERT INTO login_logs (username, success, ip) VALUES (?, 0, ?)').run(username, ip);
+      return res.status(403).json({ error: 'Ce compte est désactivé.' });
+    }
+    if (!admin) {
       recordFailedAttempt(ip);
       db.prepare('INSERT INTO login_logs (username, success, ip) VALUES (?, 0, ?)').run(username, ip);
       return res.status(401).json({ error: 'Identifiant ou mot de passe incorrect' });
@@ -414,17 +398,8 @@ app.post('/api/auth/logout', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/auth/me', (req, res) => {
-  const token = req.cookies?.authToken;
-  if (!token) return res.status(401).json({ error: 'Non authentifié' });
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    res.json({ ok: true, username: decoded.username });
-  } catch {
-    res.clearCookie('authToken');
-    res.status(401).json({ error: 'Token invalide ou expiré' });
-  }
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({ ok: true, username: req.account.username, canGenerateVideos: canGenerateVideos(req.account) });
 });
 
 // ============================================
@@ -909,6 +884,12 @@ app.get('/api/admin/videos/pending', requireAuth, (_req, res) => {
 app.post('/api/admin/videos/generate/:documentId', requireAuth, async (req, res) => {
   openSse(res);
   const send = (step, message, progress) => sseWrite(res, { step, message, progress });
+
+  // Restriction du compte (réglée depuis les utilisateurs de Kosmy Board).
+  if (!canGenerateVideos(req.account)) {
+    sseWrite(res, { error: "Votre compte n'est pas autorisé à générer des vidéos." });
+    return res.end();
+  }
 
   if (renderInProgress) {
     sseWrite(res, { error: 'Un render est déjà en cours. Veuillez patienter.' });

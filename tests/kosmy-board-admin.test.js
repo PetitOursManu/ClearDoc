@@ -21,6 +21,7 @@ import Database from 'better-sqlite3';
 import jwt from 'jsonwebtoken';
 import { createKosmyBoardRouter, migrateKosmyBoard, clearDiscoveryCache, SETTING_KEYS } from '../server/kosmyBoard.js';
 import { createKosmyBoardAdminRouter, pickLang, PROTOCOL } from '../server/kosmyBoardAdmin.js';
+import { migrateAccounts, createAdminSessions } from '../server/accounts.js';
 import { createAdminActions } from '../server/adminActions.js';
 
 const SECRET = 'test-secret-for-cleardoc';
@@ -85,17 +86,13 @@ function startClearDoc() {
     CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at DATETIME);
   `);
   migrateKosmyBoard(db);
+  migrateAccounts(db);
 
   const getSetting = (k) => db.prepare('SELECT value FROM settings WHERE key = ?').get(k)?.value || null;
   const setSetting = (k, v) => db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(k, String(v));
   const delSetting = (k) => db.prepare('DELETE FROM settings WHERE key = ?').run(k);
-  const readAdminSession = (t) => { try { return t ? jwt.verify(t, SECRET) : null; } catch { return null; } };
-  const requireAuth = (req, res, next) => {
-    const s = readAdminSession(req.cookies?.authToken);
-    if (!s) return res.status(401).json({ error: 'Non authentifié' });
-    req.admin = s;
-    next();
-  };
+  const sessions = createAdminSessions({ db, jwtSecret: SECRET, secure: false });
+  const { requireAuth, read: readAdminSession } = sessions;
   const actions = createAdminActions({
     db, getSetting, setSetting, delSetting, uploadsDir, videosDir,
     watermarkPath: path.join(dir, 'watermark.png'), remotionDir: path.join(dir, 'no-remotion'),
@@ -113,7 +110,7 @@ function startClearDoc() {
   app.use(cookieParser());
   app.use(createKosmyBoardRouter({
     db, getSetting, setSetting, delSetting, jwtSecret: SECRET, requireAuth, readAdminSession,
-    openAdminSession: () => {},
+    openAdminSession: sessions.open,
   }));
   // Les routes de l'admin de ClearDoc passent par les mêmes fonctions.
   app.post('/api/categories', requireAuth, (req, res) => res.status(201).json(actions.createCategory(req.body.title)));
@@ -287,6 +284,13 @@ describe('jeton du Board', () => {
     // Un sub relié pour un autre émetteur ne compte pas.
     app.db.prepare("UPDATE admin_users SET kosmy_board_issuer = 'https://autre.example/oidc' WHERE id = 'a1'").run();
     assertJsonError(await call(), 403, 'not_linked');
+  });
+
+  test('compte relié mais désactivé (accès retiré par le Board) : forbidden', async () => {
+    app.db.prepare("UPDATE admin_users SET disabled = 1 WHERE id = 'a1'").run();
+    const r = await call();
+    assertJsonError(r, 403, 'forbidden');
+    assert.match(r.json.message, /désactivé/);
   });
 
   test('compte relié sans droits d’administration : forbidden', async () => {
