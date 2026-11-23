@@ -24,6 +24,8 @@ interface KosmyBoardConfig {
   initiateLoginUri: string;
   linked: boolean;
   linkedToCurrentIssuer: boolean;
+  /** false pour un compte créé par Kosmy Board : il ne se connecte que par le Board. */
+  hasPassword: boolean;
 }
 
 const SECTION = 'bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-5';
@@ -132,7 +134,8 @@ export function KosmyBoardSettings() {
     if (!window.confirm(t('kosmy.link.unlinkConfirm'))) return;
     setError(null);
     setNotice(null);
-    await fetch('/api/admin/kosmy-board/unlink', { method: 'POST', credentials: 'include' });
+    const res = await fetch('/api/admin/kosmy-board/unlink', { method: 'POST', credentials: 'include' });
+    if (res.status === 409) setError(t('kosmy.link.noPassword'));
     await load();
   };
 
@@ -302,13 +305,16 @@ export function KosmyBoardSettings() {
               ) : (
                 <p className="text-sm text-muted-foreground">{t('kosmy.link.needSettings')}</p>
               )}
-              {config.linked && (
+              {config.linked && config.hasPassword && (
                 <Button type="button" variant="ghost" onClick={unlink} className="gap-2 text-muted-foreground">
                   <Unlink className="h-4 w-4" />
                   {t('kosmy.link.unlink')}
                 </Button>
               )}
             </div>
+            {config.linked && !config.hasPassword && (
+              <p className="text-xs text-muted-foreground mt-3">{t('kosmy.link.noPassword')}</p>
+            )}
           </section>
         </div>
       </main>

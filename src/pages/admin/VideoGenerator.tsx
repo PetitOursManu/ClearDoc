@@ -146,7 +146,7 @@ function ThemePreview({ theme, accent, watermarkUrl, watermarkPosition, bg }: {
 
 export function VideoGenerator() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canGenerateVideos } = useAuth();
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -443,7 +443,7 @@ export function VideoGenerator() {
     );
   }
 
-  const canGenerate = remotion.installed && selectedDoc && !generating;
+  const canGenerate = canGenerateVideos && remotion.installed && selectedDoc && !generating;
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -834,7 +834,13 @@ export function VideoGenerator() {
               </Button>
             </div>
 
-            {!remotion.installed && (
+            {!canGenerateVideos && (
+              <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                Votre compte n'est pas autorisé à générer des vidéos (réglage de vos accès dans Kosmy Board).
+              </p>
+            )}
+
+            {canGenerateVideos && !remotion.installed && (
               <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
                 Installez Remotion (section ci-dessus) avant de générer une vidéo.
               </p>

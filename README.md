@@ -146,7 +146,7 @@ From then on, **Open** in the Board signs you straight into ClearDoc, and the lo
 - Accounts are linked by the Board account identifier (`sub`) and issuer only, never by email (the Board does not verify email addresses). A Board account that is not linked gets no admin rights: it sees a message and can still use the password form.
 - The three values can also be set with environment variables, which take precedence: `KOSMY_BOARD_ISSUER`, `KOSMY_BOARD_CLIENT_ID`, `KOSMY_BOARD_CLIENT_SECRET`.
 - Behind a reverse proxy, set `APP_URL` so the redirect URI matches the one registered in the Board exactly.
-- Replacing the admin account with `npm run setup-admin` removes the link: link the new account again.
+- Replacing the admin account with `npm run setup-admin` removes the link: link the new account again. Accounts created by the Board (no password) are kept.
 - Security: state, nonce and PKCE (S256) on every sign-in; the state is single use; the issuer is checked at launch and on return; the code is exchanged with `client_secret_basic`; the ID token is fully verified (RS256 signature via `jwks_uri`, `iss`, `aud`, `exp`, `nonce`); `target_link_uri` must be a page of this instance.
 
 ---
@@ -166,7 +166,7 @@ The Board's **Admin** button can also show ClearDoc's administration **inside th
 | Interactive payslip | Zones (link to another line, delete), model image status |
 | Videos | Publish or reject the video awaiting validation, delete a published video, delete the watermark |
 | Settings | AI and voice services (API keys are write-only), default video appearance |
-| Access | Admin accounts, Kosmy Board sign-in settings (read-only, never the client secret), recent sign-ins |
+| Access | Admin accounts (linked, password, active or disabled), Kosmy Board sign-in settings (read-only, never the client secret), recent sign-ins |
 
 Rich text descriptions, image, PDF and watermark uploads, drawing zones, generating a video and installing Remotion stay in ClearDoc's own admin.
 
@@ -177,6 +177,25 @@ Rich text descriptions, image, PDF and watermark uploads, drawing zones, generat
 - The Board's **server** can reach ClearDoc at the address saved in the Board.
 
 Each request carries a 60-second, single-use token. ClearDoc checks the RS256 signature (`jwks_uri`), `typ: kb-admin+jwt` (an ID token is never accepted), `iss`, `aud` (the client ID), `exp`, the method and address it was made for (`htm`, `htu`) and that its `jti` was never used. These addresses answer JSON only, without CORS. Texts follow the Board's language (French or English).
+
+---
+
+## Users managed by Kosmy Board
+
+A Board administrator can also choose **who has access** to ClearDoc, from the Board's users: the Board then creates, updates or disables the person's ClearDoc account (protocol `kosmy.board-users.v1`, see the [specification](https://github.com/PetitOursManu/Kosmy-Board/blob/main/docs/users-api.md)). Same requirements and same token as [Admin in Kosmy Board](#admin-in-kosmy-board); the person acting must be linked to an active ClearDoc account.
+
+| Method | Address | What ClearDoc does |
+|---|---|---|
+| `GET` | `/api/kosmy-board/users` | Describes its role and restriction, and lists the accounts linked to the Board |
+| `PUT` | `/api/kosmy-board/users/{sub}` | Creates the account (no password: it signs in through the Board), or links an unlinked account with the same email, or updates it; reactivates it if disabled |
+| `DELETE` | `/api/kosmy-board/users/{sub}` | Disables the account: its sessions are closed, its data is kept |
+
+- **Role**: one, *Administrator* — every ClearDoc account administers ClearDoc.
+- **Restriction**: *Can generate videos* (default yes). Video generation uses the instance's AI and voice API credits; when it is off, the Video generator refuses to generate (the button is disabled).
+- **Disabled account**: refused everywhere — password form, sign-in with Kosmy Board, open sessions (checked on every request), admin in the Board. A new `PUT` (or a sign-in whose ID token carries `kosmy_board_access`) reactivates it; sessions opened before the deactivation stay closed.
+- **At sign-in**, when the ID token carries `kosmy_board_access` (`{ role, values }`), ClearDoc applies it like a `PUT` and creates the account if needed — never by matching the email. Without it, sign-in is unchanged.
+- **Safeguards** (`409`): you cannot remove your own access, and ClearDoc always keeps at least one active administrator. An email already used by an account linked to another Board person is refused (`409`); invalid values get a `422` with a message.
+- An account created by the Board has no password and cannot be unlinked from **Admin → Kosmy Board**.
 
 ---
 
@@ -238,7 +257,7 @@ The `data/` folder (database + uploaded images) is listed in `.gitignore`. It wi
 | `npm start` | Same as `npm run server` |
 | `npm run build` | Build the frontend for production |
 | `npm run setup-admin` | Create or replace the admin account |
-| `npm test` | Run the tests (Kosmy Board sign-in and admin in the Board) |
+| `npm test` | Run the tests (Kosmy Board sign-in, admin in the Board, users managed by the Board) |
 
 ---
 
@@ -270,6 +289,8 @@ The `data/` folder (database + uploaded images) is listed in `.gitignore`. It wi
 | `POST` | `/api/admin/kosmy-board/unlink` | Unlink the admin account (protected) |
 | `GET` | `/api/kosmy-board/admin` | Admin in Kosmy Board: list of sections (Board token) |
 | `GET` / `POST` | `/api/kosmy-board/admin/{section}` | Admin in Kosmy Board: a section, or an action in it (Board token) |
+| `GET` | `/api/kosmy-board/users` | Users managed by Kosmy Board: role, restriction, linked accounts (Board token) |
+| `PUT` / `DELETE` | `/api/kosmy-board/users/{sub}` | Users managed by Kosmy Board: create / update, or disable an account (Board token) |
 
 ### Documents (public read, protected write)
 

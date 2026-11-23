@@ -6,17 +6,23 @@
  * échange du code, vérification de l'ID token, cookie du parcours) et le routeur
  * Express qui les assemble.
  *
- * ClearDoc n'a qu'un compte administrateur. Il se relie à un compte du Board
- * depuis Admin > Kosmy Board (« Relier mon compte ») : le `sub` reçu est
- * enregistré sur ce compte, avec l'émetteur. Ensuite, une connexion par le Board
- * avec ce `sub` ouvre la session admin. Jamais de liaison par l'e-mail, jamais
- * de droits admin pour un `sub` inconnu.
+ * Dans ClearDoc, tout compte est administrateur. Un compte avec mot de passe se
+ * relie à un compte du Board depuis Admin > Kosmy Board (« Relier mon compte ») :
+ * le `sub` reçu est enregistré sur ce compte, avec l'émetteur. Ensuite, une
+ * connexion par le Board avec ce `sub` ouvre la session admin. Jamais de liaison
+ * par l'e-mail à la connexion, jamais de droits pour un `sub` inconnu.
  *
- * Cahier des charges : Kosmy Board, docs/integration.md.
+ * Quand le Board gère les utilisateurs (kosmy.board-users.v1), l'ID token porte
+ * `kosmy_board_access` : la connexion applique alors ce rôle et ces restrictions,
+ * comme un PUT du Board, et crée le compte s'il n'existe pas encore.
+ * Un compte désactivé ne se connecte pas.
+ *
+ * Cahier des charges : Kosmy Board, docs/integration.md et docs/users-api.md.
  */
 import crypto from 'crypto';
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import { provisionBoardAccount, AccountError, isActive, hasPassword } from './accounts.js';
 
 export const LOGIN_PATH = '/auth/kosmy-board/login';
 export const CALLBACK_PATH = '/auth/kosmy-board/callback';
@@ -311,12 +317,15 @@ export async function verifyIdToken(idToken, { entry, clientId, nonce }) {
     throw new OidcError('token', 'invalid ID token: missing sub');
   }
   const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const access = payload.kosmy_board_access;
   return {
     sub: payload.sub,
     name: str(payload.name),
     email: str(payload.email),
     preferred_username: str(payload.preferred_username),
     locale: str(payload.locale),
+    // Accès géré par le Board (docs/users-api.md) : { role, values }.
+    access: access && typeof access === 'object' && !Array.isArray(access) ? access : undefined,
   };
 }
 
@@ -338,7 +347,8 @@ export function readSettings(getSetting) {
 
 /**
  * Le compte admin relié à ce compte du Board : par `sub` et émetteur
- * uniquement, jamais par l'e-mail. null si aucun.
+ * uniquement, jamais par l'e-mail. null si aucun. Le compte peut être
+ * désactivé : à l'appelant de le vérifier.
  */
 export function findLinkedAdmin(db, issuer, sub) {
   if (typeof sub !== 'string' || !sub) return null;
@@ -467,6 +477,8 @@ export function createKosmyBoardRouter(o) {
       redirectUri: redirectUri(base),
       initiateLoginUri: initiateLoginUri(base),
       linked: Boolean(admin?.kosmy_board_sub),
+      // Un compte créé par le Board n'a pas de mot de passe : le délier le fermerait.
+      hasPassword: hasPassword(admin),
       linkedToCurrentIssuer: Boolean(
         admin?.kosmy_board_sub && settings && admin.kosmy_board_issuer === settings.issuer,
       ),
@@ -507,6 +519,8 @@ export function createKosmyBoardRouter(o) {
   });
 
   router.post('/api/admin/kosmy-board/unlink', requireAuth, (req, res) => {
+    const admin = db.prepare('SELECT * FROM admin_users WHERE username = ?').get(req.admin.username);
+    if (!hasPassword(admin)) return res.status(409).json({ error: 'no_password' });
     db.prepare('UPDATE admin_users SET kosmy_board_sub = NULL, kosmy_board_issuer = NULL WHERE username = ?')
       .run(req.admin.username);
     res.json({ ok: true });
@@ -605,11 +619,39 @@ export function createKosmyBoardRouter(o) {
 
       if (flow.mode === 'link') return finishLink(req, res, base, flow, settings.issuer, claims.sub);
 
+      // Accès géré par le Board : mêmes règles qu'un PUT, compte créé s'il n'existe pas
+      // encore (jamais relié par l'e-mail à la connexion), réactivé s'il était désactivé.
+      if (claims.access) {
+        try {
+          provisionBoardAccount(db, {
+            issuer: settings.issuer,
+            sub: claims.sub,
+            body: {
+              name: claims.name || claims.preferred_username,
+              email: claims.email,
+              locale: claims.locale,
+              role: claims.access.role,
+              values: claims.access.values,
+            },
+            atLogin: true,
+          });
+        } catch (e) {
+          if (!(e instanceof AccountError)) throw e;
+          console.error('[kosmy-board] kosmy_board_access refused:', e.key);
+          logLogin(req, `kosmy-board:${claims.sub}`, false);
+          return redirectWithError(res, base, LOGIN_PAGE, 'access');
+        }
+      }
+
       // Liaison par `sub` (et émetteur) uniquement : jamais par l'e-mail.
       const admin = findLinkedAdmin(db, settings.issuer, claims.sub);
       if (!admin) {
         logLogin(req, `kosmy-board:${claims.sub}`, false);
         return redirectWithError(res, base, LOGIN_PAGE, 'unknown_account');
+      }
+      if (!isActive(admin)) {
+        logLogin(req, admin.username, false);
+        return redirectWithError(res, base, LOGIN_PAGE, 'disabled');
       }
       logLogin(req, admin.username, true);
       openAdminSession(res, admin);
@@ -626,7 +668,7 @@ export function createKosmyBoardRouter(o) {
     // désigner ce même compte.
     const admin = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(flow.uid);
     const current = readAdminSession(req.cookies?.authToken);
-    if (!admin || (current && current.username !== admin.username)) {
+    if (!isActive(admin) || (current && current.username !== admin.username)) {
       return redirectWithError(res, base, SETTINGS_PAGE, 'session');
     }
     const other = db.prepare('SELECT id FROM admin_users WHERE kosmy_board_issuer = ? AND kosmy_board_sub = ? AND id != ?')

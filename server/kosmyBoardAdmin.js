@@ -22,6 +22,7 @@ import {
   readSettings, discover, signingKey, findLinkedAdmin, appBaseUrl, redirectUri, initiateLoginUri,
 } from './kosmyBoard.js';
 import { AdminActionError, isSecretSetting } from './adminActions.js';
+import { isActive, hasPassword } from './accounts.js';
 import { VIDEO_THEME_IDS } from '../services/videoGenerator.js';
 
 export const ADMIN_API_PATH = '/api/kosmy-board/admin';
@@ -54,6 +55,7 @@ const TEXTS = {
     'err.unreachable': 'ClearDoc ne joint pas Kosmy Board pour vérifier le jeton.',
     'err.notLinked': 'Ce compte Kosmy Board n\'est relié à aucun compte ClearDoc. Connectez-vous à ClearDoc avec votre mot de passe, puis reliez-le dans Admin > Kosmy Board.',
     'err.forbidden': 'Votre compte ClearDoc n\'a pas les droits d\'administration.',
+    'err.disabled': 'Votre compte ClearDoc est désactivé.',
     'err.section': 'Section inconnue.',
     'err.action': 'Action inconnue.',
     'err.method': 'Méthode non autorisée.',
@@ -252,13 +254,18 @@ const TEXTS = {
 
     'access.title': 'Accès',
     'access.description': 'Qui peut administrer ClearDoc.',
-    'access.notice': 'Le compte administrateur se crée sur le serveur (« npm run setup-admin »). Les réglages de la connexion avec Kosmy Board et la liaison du compte se changent dans ClearDoc (Admin > Kosmy Board) : les changer d\'ici couperait cet accès.',
+    'access.notice': 'Le premier compte administrateur se crée sur le serveur (« npm run setup-admin ») ; les suivants se donnent depuis les utilisateurs de Kosmy Board. Les réglages de la connexion avec Kosmy Board et la liaison du compte se changent dans ClearDoc (Admin > Kosmy Board) : les changer d\'ici couperait cet accès.',
     'access.accounts': 'Comptes administrateur',
     'access.col.username': 'Identifiant',
     'access.col.created': 'Créé le',
     'access.col.kosmy': 'Kosmy Board',
     'access.linked': 'Relié',
     'access.notLinked': 'Non relié',
+    'access.col.state': 'État',
+    'access.active': 'Actif',
+    'access.disabled': 'Désactivé',
+    'access.col.password': 'Mot de passe',
+    'access.passwordNone': 'Aucun (Kosmy Board seulement)',
     'access.you': '{name} (vous)',
     'access.sso': 'Connexion avec Kosmy Board',
     'access.issuer': 'Émetteur',
@@ -289,6 +296,7 @@ const TEXTS = {
     'err.unreachable': 'ClearDoc cannot reach Kosmy Board to check the token.',
     'err.notLinked': 'This Kosmy Board account is not linked to any ClearDoc account. Sign in to ClearDoc with your password, then link it in Admin > Kosmy Board.',
     'err.forbidden': 'Your ClearDoc account does not have administrator rights.',
+    'err.disabled': 'Your ClearDoc account is disabled.',
     'err.section': 'Unknown section.',
     'err.action': 'Unknown action.',
     'err.method': 'Method not allowed.',
@@ -487,13 +495,18 @@ const TEXTS = {
 
     'access.title': 'Access',
     'access.description': 'Who can administer ClearDoc.',
-    'access.notice': 'The administrator account is created on the server ("npm run setup-admin"). The Kosmy Board sign-in settings and the account link are changed in ClearDoc (Admin > Kosmy Board): changing them from here would cut this access.',
+    'access.notice': 'The first administrator account is created on the server ("npm run setup-admin"); the next ones are given from the Kosmy Board users. The Kosmy Board sign-in settings and the account link are changed in ClearDoc (Admin > Kosmy Board): changing them from here would cut this access.',
     'access.accounts': 'Administrator accounts',
     'access.col.username': 'Username',
     'access.col.created': 'Created',
     'access.col.kosmy': 'Kosmy Board',
     'access.linked': 'Linked',
     'access.notLinked': 'Not linked',
+    'access.col.state': 'Status',
+    'access.active': 'Active',
+    'access.disabled': 'Disabled',
+    'access.col.password': 'Password',
+    'access.passwordNone': 'None (Kosmy Board only)',
     'access.you': '{name} (you)',
     'access.sso': 'Sign-in with Kosmy Board',
     'access.issuer': 'Issuer',
@@ -541,9 +554,14 @@ export function pickLang(header) {
   return ranked[0]?.lang || 'fr';
 }
 
-function translator(lang) {
-  const dict = TEXTS[lang] || TEXTS.fr;
-  const t = (key, params = {}) => String(dict[key] ?? TEXTS.fr[key] ?? key)
+/**
+ * Les textes de cette langue ; `extra` ({ fr: {…}, en: {…} }) ajoute ceux d'un
+ * autre module (les utilisateurs gérés par le Board reprennent ceux du jeton).
+ */
+export function translator(lang, extra = {}) {
+  const fr = { ...TEXTS.fr, ...(extra.fr || {}) };
+  const dict = { ...fr, ...(TEXTS[lang] || {}), ...(extra[lang] || {}) };
+  const t = (key, params = {}) => String(dict[key] ?? fr[key] ?? key)
     .replace(/\{(\w+)\}/g, (m, k) => (params[k] !== undefined ? String(params[k]) : m));
   t.has = (key) => key in dict;
   t.lang = lang;
@@ -563,7 +581,7 @@ export class BoardAdminError extends Error {
   }
 }
 
-function sendJson(res, status, body) {
+export function sendJson(res, status, body) {
   res.status(status).set({
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
@@ -639,6 +657,42 @@ export async function verifyBoardToken(token, { entry, settings, method, path, j
   return payload;
 }
 
+/**
+ * Authentifie une requête du Board : jeton (voir verifyBoardToken, pour la
+ * méthode et le chemin de cette requête), puis `sub` du jeton → compte relié,
+ * actif et administrateur. Le Board dit qui est la personne ; les droits, c'est
+ * ClearDoc qui les donne. Lance une BoardAdminError (401 / 403) sinon.
+ *
+ * @param {import('express').Request} req
+ * @param {(key: string) => string} t  textes err.token, err.notConfigured, err.unreachable,
+ *   err.notLinked, err.disabled, err.forbidden
+ * @param {object} o  { db, getSetting, fetchImpl, jtis, isAdmin }
+ */
+export async function authenticateBoardRequest(req, t, { db, getSetting, fetchImpl = fetch, jtis, isAdmin = Boolean }) {
+  const m = /^Bearer[ \t]+([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i.exec(req.get('authorization') || '');
+  if (!m) throw new BoardAdminError(401, 'invalid_token', t('err.token'));
+  const settings = readSettings(getSetting);
+  if (!settings) throw new BoardAdminError(401, 'invalid_token', t('err.notConfigured'));
+  let entry;
+  try {
+    entry = await discover(settings.issuer, fetchImpl);
+  } catch {
+    throw new BoardAdminError(401, 'invalid_token', t('err.unreachable'));
+  }
+  let payload;
+  try {
+    payload = await verifyBoardToken(m[1], { entry, settings, method: req.method, path: req.path, jtis });
+  } catch {
+    throw new BoardAdminError(401, 'invalid_token', t('err.token'));
+  }
+  const account = findLinkedAdmin(db, settings.issuer, payload.sub);
+  if (!account) throw new BoardAdminError(403, 'not_linked', t('err.notLinked'));
+  // Accès retiré par le Board (ou compte désactivé) : plus aucun droit.
+  if (!isActive(account)) throw new BoardAdminError(403, 'forbidden', t('err.disabled'));
+  if (!isAdmin(account)) throw new BoardAdminError(403, 'forbidden', t('err.forbidden'));
+  return { account, settings, claims: payload };
+}
+
 /* ============================================================
  * Petits outils pour décrire les sections
  * ============================================================ */
@@ -709,42 +763,21 @@ function rowId(body, t) {
  * @param {(key: string) => string | null} o.getSetting  priorité env > base
  * @param {ReturnType<import('./adminActions.js').createAdminActions>} o.actions  fonctions de l'admin de ClearDoc
  * @param {(account: object) => boolean} [o.isAdmin]  droits d'admin du compte relié ; dans ClearDoc, tout
- *   compte (table admin_users) est administrateur
+ *   compte actif (table admin_users) est administrateur
+ * @param {ReturnType<typeof createJtiStore>} [o.jtis]  `jti` déjà reçus (partagés avec les utilisateurs gérés par le Board)
  * @param {typeof fetch} [o.fetchImpl]
  */
 export function createKosmyBoardAdminRouter(o) {
   const { db, getSetting, actions } = o;
   const fetchImpl = o.fetchImpl || fetch;
   const isAdmin = o.isAdmin || ((account) => Boolean(account));
-  const jtis = createJtiStore();
+  const jtis = o.jtis || createJtiStore();
   const parseJson = express.json({ limit: '256kb', type: () => true });
   const router = express.Router();
 
   /* ---------- Authentification ---------- */
 
-  async function authenticate(req, t) {
-    const m = /^Bearer[ \t]+([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i.exec(req.get('authorization') || '');
-    if (!m) throw new BoardAdminError(401, 'invalid_token', t('err.token'));
-    const settings = readSettings(getSetting);
-    if (!settings) throw new BoardAdminError(401, 'invalid_token', t('err.notConfigured'));
-    let entry;
-    try {
-      entry = await discover(settings.issuer, fetchImpl);
-    } catch {
-      throw new BoardAdminError(401, 'invalid_token', t('err.unreachable'));
-    }
-    let payload;
-    try {
-      payload = await verifyBoardToken(m[1], { entry, settings, method: req.method, path: req.path, jtis });
-    } catch {
-      throw new BoardAdminError(401, 'invalid_token', t('err.token'));
-    }
-    // Le Board dit qui est la personne ; les droits, c'est ClearDoc qui les donne.
-    const account = findLinkedAdmin(db, settings.issuer, payload.sub);
-    if (!account) throw new BoardAdminError(403, 'not_linked', t('err.notLinked'));
-    if (!isAdmin(account)) throw new BoardAdminError(403, 'forbidden', t('err.forbidden'));
-    return { account, settings, claims: payload };
-  }
+  const authenticate = (req, t) => authenticateBoardRequest(req, t, { db, getSetting, fetchImpl, jtis, isAdmin });
 
   /* ---------- Sections ---------- */
 
@@ -1339,7 +1372,7 @@ export function createKosmyBoardAdminRouter(o) {
     access: {
       build(ctx) {
         const { t, account, settings, base } = ctx;
-        const admins = db.prepare('SELECT id, username, created_at, kosmy_board_sub, kosmy_board_issuer FROM admin_users ORDER BY username').all();
+        const admins = db.prepare('SELECT * FROM admin_users ORDER BY username').all();
         const logins = db.prepare('SELECT * FROM login_logs ORDER BY rowid DESC LIMIT 50').all();
         return {
           description: t('access.description'),
@@ -1351,6 +1384,8 @@ export function createKosmyBoardAdminRouter(o) {
                 { key: 'username', label: t('access.col.username') },
                 { key: 'created', label: t('access.col.created') },
                 { key: 'kosmy', label: t('access.col.kosmy') },
+                { key: 'password', label: t('access.col.password') },
+                { key: 'state', label: t('access.col.state') },
               ],
               rows: admins.map((a) => ({
                 id: a.id,
@@ -1360,6 +1395,10 @@ export function createKosmyBoardAdminRouter(o) {
                   kosmy: a.kosmy_board_sub && a.kosmy_board_issuer === settings.issuer
                     ? { text: t('access.linked'), tone: 'success' }
                     : { text: t('access.notLinked'), tone: 'muted' },
+                  password: hasPassword(a) ? t('yes') : { text: t('access.passwordNone'), tone: 'muted' },
+                  state: isActive(a)
+                    ? { text: t('access.active'), tone: 'success' }
+                    : { text: t('access.disabled'), tone: 'danger' },
                 },
               })),
             },
